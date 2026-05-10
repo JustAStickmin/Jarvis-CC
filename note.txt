@@ -1,40 +1,31 @@
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
-banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana banana
+
+    +-----------------------------------------+
+    |         J . A . R . V . I . S           |
+    |              [ ONLINE ]                 |
+    +-----------------------------------------+
+
+    new face update dropped
+    ========================
+
+    - 5 rings now instead of 4
+    - rings are smoother (denser steps)
+    - corner brackets on the HUD like a targeting thing
+    - orange arc spins one way, another arc spins the other way
+    - when jarvis is talking a line scans across the middle
+    - inner ring is gray now for depth
+
+    help screen is now grouped by category
+    =======================================
+
+    [ GENERAL ]  [ FUN ]  [ LIGHTS ]
+    [ AE2 NETWORK ]  [ AUDIO ]  [ SYSTEM ]
+
+    storage bar
+    ===========
+    fixed the text cutting off on the skinny monitor
+    numbers now show as 1.2k or 4.5M instead of 999,999,999
+
+    +-----------------------------------------+
+    |             still going                 |
+    +-----------------------------------------+
+
