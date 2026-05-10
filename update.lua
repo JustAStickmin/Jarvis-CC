@@ -2,7 +2,7 @@
 -- Run "wget run https://raw.githubusercontent.com/JustAStickmin/Jarvis-CC/main/update.lua"
 -- once to install, then just run "update" anytime to refresh.
 --
--- Your local config.lua is NEVER overwritten by this updater.
+-- Your local config.lua and satelliteconfig.lua are NEVER overwritten.
 
 local repo   = "JustAStickmin/Jarvis-CC"
 local branch = "main"
@@ -14,6 +14,7 @@ local files = {
     "update.lua",
     "labels.lua",
     "config.example.lua",
+    "satelliteconfig.example.lua",
     "satellite.lua",
     "satellites/campfire.lua",
 }
@@ -36,22 +37,31 @@ for _, f in ipairs(files) do
     end
 end
 
--- Bootstrap config.lua from the example on first install only
-if fs.exists("config.example.lua") and not fs.exists("config.lua") then
-    local src = fs.open("config.example.lua", "r")
-    local dst = fs.open("config.lua", "w")
-    if src and dst then
-        dst.write(src.readAll())
-        src.close() ; dst.close()
-        print("[JARVIS] Created config.lua from config.example.lua.")
-        print("[JARVIS] Edit config.lua to set role + assignments.")
+-- Bootstrap configs from their examples on first install only.
+local function bootstrap(example, target)
+    if fs.exists(example) and not fs.exists(target) then
+        local src = fs.open(example, "r")
+        local dst = fs.open(target, "w")
+        if src and dst then
+            dst.write(src.readAll())
+            src.close() ; dst.close()
+            print("[JARVIS] Created "..target.." from "..example..".")
+            return true
+        end
     end
+    return false
+end
+
+local madeMain = bootstrap("config.example.lua",          "config.lua")
+local madeSat  = bootstrap("satelliteconfig.example.lua", "satelliteconfig.lua")
+if madeMain or madeSat then
+    print("[JARVIS] Edit your configs to assign monitors / roles, then run:")
+    print("  Main computer       : main")
+    print("  Satellite computer  : satellite")
 end
 
 if failed == 0 then
     print("[JARVIS] Update complete.")
-    print("  Main computer       : run 'main'")
-    print("  Satellite computer  : run 'satellite'")
 else
-    print("[JARVIS] Update finished with "..failed.." failure(s). Check the URL above is reachable.")
+    print("[JARVIS] Update finished with "..failed.." failure(s). Check the URL is reachable.")
 end

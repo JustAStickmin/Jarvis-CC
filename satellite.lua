@@ -1,23 +1,27 @@
 -- satellite.lua  —  Runs on a satellite computer (separate from main JARVIS).
--- Loads config.lua to get its role + monitor, opens all modems for rednet,
--- and runs the animation/program for that role while listening for commands.
+-- Loads satelliteconfig.lua to get its role + monitor, opens all modems
+-- for rednet, and runs the animation/program for that role while listening
+-- for commands from JARVIS.
 --
 -- Setup on a satellite computer:
 --   1. wget run https://raw.githubusercontent.com/JustAStickmin/Jarvis-CC/main/update.lua
---   2. edit config.lua   -- set role = "campfire" and (if needed) satellite.monitor
+--   2. edit satelliteconfig.lua    -- set role + monitor
 --   3. satellite
 
--- ─── Load config ────────────────────────────────────────
+-- ─── Load satellite config ─────────────────────────────
 local function loadConfig()
-    if not fs.exists("config.lua") then
-        print("[SATELLITE] No config.lua. Run 'update' first, then edit config.lua.")
+    if not fs.exists("satelliteconfig.lua") then
+        print("[SATELLITE] No satelliteconfig.lua. Run 'update' first, then edit it.")
         return nil
     end
-    local fn, err = loadfile("config.lua")
-    if not fn then print("[SATELLITE] config.lua syntax error: "..tostring(err)) ; return nil end
+    local fn, err = loadfile("satelliteconfig.lua")
+    if not fn then
+        print("[SATELLITE] satelliteconfig.lua syntax error: "..tostring(err))
+        return nil
+    end
     local ok, result = pcall(fn)
     if not ok or type(result) ~= "table" then
-        print("[SATELLITE] config.lua did not return a table.")
+        print("[SATELLITE] satelliteconfig.lua did not return a table.")
         return nil
     end
     return result
@@ -27,15 +31,13 @@ local config = loadConfig()
 if not config then return end
 
 local role = config.role
-if not role or role == "main" then
-    print("[SATELLITE] config.lua role is '"..tostring(role).."'.")
-    print("[SATELLITE] Set role to a satellite role like \"campfire\" in config.lua.")
+if not role or role == "" then
+    print("[SATELLITE] No role set in satelliteconfig.lua.")
+    print("[SATELLITE] Edit satelliteconfig.lua and set role to e.g. \"campfire\".")
     return
 end
 
-local satCfg = config.satellite or {}
-
--- ─── Open all modems ────────────────────────────────────
+-- ─── Open all modems ───────────────────────────────────
 local opened = {}
 for _, name in ipairs(peripheral.getNames()) do
     if peripheral.getType(name) == "modem" then
@@ -49,12 +51,13 @@ if #opened == 0 then
 end
 print("[SATELLITE] Opened modem(s): "..table.concat(opened, ", "))
 
--- ─── Find monitor ───────────────────────────────────────
+-- ─── Find monitor ──────────────────────────────────────
 local mon
-if satCfg.monitor then
-    mon = peripheral.wrap(satCfg.monitor)
+if config.monitor then
+    mon = peripheral.wrap(config.monitor)
     if not mon then
-        print("[SATELLITE] Monitor '"..satCfg.monitor.."' not found. Check config.lua.")
+        print("[SATELLITE] Monitor '"..config.monitor.."' not found.")
+        print("[SATELLITE] Run 'labels' to check the name, then edit satelliteconfig.lua.")
         return
     end
 else
@@ -63,7 +66,7 @@ end
 if not mon then
     print("[SATELLITE] No monitor connected.")
     print("[SATELLITE] Attach one and run 'labels' to get its peripheral name,")
-    print("[SATELLITE] then set satellite.monitor in config.lua.")
+    print("[SATELLITE] then set monitor in satelliteconfig.lua.")
     return
 end
 
@@ -71,7 +74,7 @@ end
 local modulePath = "satellites/"..role..".lua"
 if not fs.exists(modulePath) then
     print("[SATELLITE] Animation '"..role.."' not found at "..modulePath..".")
-    print("[SATELLITE] Run 'update' to pull it, or check the role name in config.lua.")
+    print("[SATELLITE] Run 'update' to pull it, or check the role name.")
     return
 end
 local ok, mod = pcall(dofile, modulePath)
@@ -80,8 +83,8 @@ if not ok or type(mod) ~= "table" then
     return
 end
 
--- ─── Initialise ────────────────────────────────────────
-if mod.init then mod.init(mon, satCfg) end
+-- ─── Initialise ───────────────────────────────────────
+if mod.init then mod.init(mon, config) end
 print("[SATELLITE] Online.")
 print("  Role:    "..role)
 print("  ID:      "..os.getComputerID())
@@ -90,7 +93,7 @@ print("  Module:  "..modulePath)
 -- Announce ourselves to JARVIS
 rednet.broadcast({type = "hello", role = role, id = os.getComputerID()}, "jarvis")
 
--- ─── Loops ─────────────────────────────────────────────
+-- ─── Loops ────────────────────────────────────────────
 local running = true
 
 local function listenLoop()
