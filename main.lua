@@ -1,50 +1,25 @@
 -- JARVIS - CC: Tweaked AI Assistant
 -- Peripherals: chatBox, meBridge, redstoneIntegrator x N, speaker, 7 monitors
 
+local box    = peripheral.find("chatBox")
+local bridge = peripheral.find("meBridge")
+local spk    = peripheral.find("speaker")
+
 -- ═══════════════════════════════════════════════════════
---  CONFIG
---  Loads peripheral assignments from config.lua.
---  Run 'labels' to see each monitor's peripheral name,
---  then edit config.lua to fill in the assignments.
---  See config.example.lua for the template and instructions.
---  Any nil values fall back to auto-detection.
+--  MONITOR CONFIG
+--  If auto-detection assigns monitors incorrectly, set the
+--  peripheral names here (e.g. "monitor_0").
+--  Run the script once to see each monitor's name flashed
+--  on screen and printed to the terminal, then fill these in.
+--  Leave as nil to use auto-detection.
 -- ═══════════════════════════════════════════════════════
-local function loadConfig()
-    if not fs.exists("config.lua") then
-        print("[JARVIS] No config.lua found. Using auto-detection.")
-        print("[JARVIS] Tip: run 'labels' then edit config.lua to set assignments.")
-        return { monitors = {} }
-    end
-    local fn, err = loadfile("config.lua")
-    if not fn then
-        print("[JARVIS] config.lua syntax error: "..tostring(err))
-        print("[JARVIS] Falling back to auto-detection.")
-        return { monitors = {} }
-    end
-    local ok, result = pcall(fn)
-    if not ok or type(result) ~= "table" then
-        print("[JARVIS] config.lua did not return a table. Falling back.")
-        return { monitors = {} }
-    end
-    result.monitors = result.monitors or {}
-    return result
-end
-
-local config = loadConfig()
-
--- Single-instance peripherals (config can override; otherwise auto-find)
-local box    = config.chatBox  and peripheral.wrap(config.chatBox)  or peripheral.find("chatBox")
-local bridge = config.meBridge and peripheral.wrap(config.meBridge) or peripheral.find("meBridge")
-local spk    = config.speaker  and peripheral.wrap(config.speaker)  or peripheral.find("speaker")
-
--- Monitor role assignments (nil → auto-detect by aspect ratio)
-local CFG_HELP    = config.monitors.helpMon    -- 4x5 commands list
-local CFG_FACE    = config.monitors.faceMon    -- 4x4 JARVIS HUD / spinning rings
-local CFG_STO     = config.monitors.stoMon     -- 2x6 AE2 storage bar  (tall portrait)
-local CFG_ENERGY  = config.monitors.energyMon  -- 3x3 AE2 energy bar
-local CFG_LAST    = config.monitors.lastMon    -- 1x3 last response     (tall portrait)
-local CFG_CLOCK   = config.monitors.clockMon   -- 2x1 clock             (very wide)
-local CFG_LIGHTS  = config.monitors.lightsMon  -- 1x1 lights status
+local CFG_HELP    = nil   -- 4x5 commands list
+local CFG_FACE    = nil   -- 4x4 JARVIS HUD / spinning rings
+local CFG_STO     = nil   -- 2x6 AE2 storage bar  (tall portrait)
+local CFG_ENERGY  = nil   -- 3x3 AE2 energy bar
+local CFG_LAST    = nil   -- 1x3 last response     (tall portrait)
+local CFG_CLOCK   = nil   -- 2x1 clock             (very wide)
+local CFG_LIGHTS  = nil   -- 1x1 lights status
 
 -- ─────────────────────────────────────────────
 --  Response tables
@@ -640,7 +615,7 @@ local function drawEnergy()
     local ok, stored, maxE, usage = pcall(function()
         return bridge.getEnergyStorage(), bridge.getMaxEnergyStorage(), bridge.getEnergyUsage()
     end)
-    if not ok then
+    if not ok or not stored or not maxE or maxE == 0 then
         centerWrite(mon, math.floor(h/2), "Bridge", colors.red, colors.black)
         centerWrite(mon, math.floor(h/2)+1, "offline", colors.red, colors.black)
         return
