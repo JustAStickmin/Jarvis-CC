@@ -70,3 +70,6 @@ scratch/
 saves/
 world/
 
+# Local JARVIS config (each CC computer keeps its own monitor assignments)
+config.lua
+
