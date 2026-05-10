@@ -39,3 +39,34 @@ luac.out
 *.x86_64
 *.hex
 
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor/IDE files
+*.swp
+*.swo
+*~
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# VS Code — uncomment the next line if you DON'T want to share editor settings
+# .vscode/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Logs and local notes
+*.log
+notes.txt
+TODO.local.md
+scratch/
+
+# CC: Tweaked save state (in case anyone copies a save in here by accident)
+saves/
+world/
+
