@@ -7,17 +7,24 @@
 local repo   = "JustAStickmin/Jarvis-CC"
 local branch = "main"
 
--- Add new filenames here as the project grows
+-- Add new filenames here as the project grows.
+-- Subdirectories (e.g. "satellites/foo.lua") are auto-created.
 local files = {
     "main.lua",
     "update.lua",
     "labels.lua",
     "config.example.lua",
+    "satellite.lua",
+    "satellites/campfire.lua",
 }
 
 print("[JARVIS] Updating from "..repo.."@"..branch.."...")
 local failed = 0
 for _, f in ipairs(files) do
+    local dir = fs.getDir(f)
+    if dir ~= "" and not fs.exists(dir) then
+        fs.makeDir(dir)
+    end
     if fs.exists(f) then fs.delete(f) end
     local url = "https://raw.githubusercontent.com/"..repo.."/"..branch.."/"..f
     local ok = shell.run("wget", url, f)
@@ -35,15 +42,16 @@ if fs.exists("config.example.lua") and not fs.exists("config.lua") then
     local dst = fs.open("config.lua", "w")
     if src and dst then
         dst.write(src.readAll())
-        src.close()
-        dst.close()
+        src.close() ; dst.close()
         print("[JARVIS] Created config.lua from config.example.lua.")
-        print("[JARVIS] Run 'labels' then 'edit config.lua' to assign monitors.")
+        print("[JARVIS] Edit config.lua to set role + assignments.")
     end
 end
 
 if failed == 0 then
-    print("[JARVIS] Update complete. Run 'main' to launch.")
+    print("[JARVIS] Update complete.")
+    print("  Main computer       : run 'main'")
+    print("  Satellite computer  : run 'satellite'")
 else
     print("[JARVIS] Update finished with "..failed.." failure(s). Check the URL above is reachable.")
 end

@@ -46,6 +46,18 @@ local CFG_LAST    = config.monitors.lastMon    -- 1x3 last response     (tall po
 local CFG_CLOCK   = config.monitors.clockMon   -- 2x1 clock             (very wide)
 local CFG_LIGHTS  = config.monitors.lightsMon  -- 1x1 lights status
 
+-- ═══════════════════════════════════════════════════════
+--  SATELLITE COMMS
+--  Open every modem on the computer and listen on the
+--  "jarvis" rednet protocol. Satellites announce themselves
+--  with a "hello" message containing their role + ID.
+-- ═══════════════════════════════════════════════════════
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "modem" then
+        rednet.open(name)
+    end
+end
+
 -- ─────────────────────────────────────────────
 --  Response tables
 -- ─────────────────────────────────────────────
@@ -385,6 +397,23 @@ local lightsState  = false
 local lastResponse = "Awaiting command..."
 local hudTick      = 0
 local speaking     = false
+local satellites   = {}   -- role → {id = computerID, lastSeen = epochMs}
+
+-- Satellite helpers
+local function pingSatellites()
+    rednet.broadcast({cmd = "ping", target = "all"}, "jarvis")
+end
+
+local function sendToSatellite(role, cmd)
+    local sat = satellites[role]
+    if sat then
+        rednet.send(sat.id, {cmd = cmd, target = role}, "jarvis")
+        return true
+    end
+    -- Fallback: broadcast — satellite will pick it up by role match
+    rednet.broadcast({cmd = cmd, target = role}, "jarvis")
+    return false
+end
 
 -- ─────────────────────────────────────────────
 --  Helpers
@@ -523,6 +552,12 @@ local helpSections = {
         {"items",           "item count"},
         {"find <item>",     "find item"},
         {"network",         "network info"},
+    }},
+    { name = "SATELLITES", col = colors.magenta, cmds = {
+        {"lite",            "toggle campfire"},
+        {"lite on",         "ignite campfire"},
+        {"lite off",        "douse campfire"},
+        {"satellites",      "list connected"},
     }},
     { name = "AUDIO", col = colors.purple, cmds = {
         {"beep",            "beep"},
@@ -1066,6 +1101,19 @@ local function chatLoop()
             end)
             if ok then say("Network status: "..info) else say("ME Bridge offline.") end
 
+        elseif cmd == "lite" or cmd == "light" then
+            local sub = words[3] and words[3]:lower() or nil
+            if     sub == "on"  then sendToSatellite("campfire", "on")     ; say("Campfire ignited.")
+            elseif sub == "off" then sendToSatellite("campfire", "off")    ; say("Campfire doused.")
+            else                     sendToSatellite("campfire", "toggle") ; say("Toggling the campfire.")
+            end
+        elseif cmd == "satellites" then
+            local list = {}
+            for r, info in pairs(satellites) do
+                table.insert(list, r.." (#"..info.id..")")
+            end
+            if #list > 0 then say("Satellites online: "..table.concat(list, ", ")..".")
+            else say("No satellites currently online. Pinging...") ; pingSatellites() end
         elseif cmd == "beep" then
             if spk then pcall(function() spk.playNote("pling",1,12) end) ; say("Beep.")
             else say("No speaker connected.") end
@@ -1122,6 +1170,21 @@ local function storageLoop() while running do drawStorage() ; sleep(5)   end end
 local function clockLoop()   while running do drawClock()   ; sleep(1)   end end
 local function energyLoop()  while running do drawEnergy()  ; sleep(5)   end end
 
+-- Listens for satellite hellos / pongs and tracks them by role.
+local function satelliteLoop()
+    while running do
+        local id, msg = rednet.receive("jarvis")
+        if type(msg) == "table" and (msg.type == "hello" or msg.type == "pong") then
+            local satId = msg.id or id
+            local known = satellites[msg.role]
+            satellites[msg.role] = {id = satId, lastSeen = os.epoch("utc")}
+            if not known then
+                print("[JARVIS] Satellite online: "..msg.role.." (#"..satId..")")
+            end
+        end
+    end
+end
+
 -- ─────────────────────────────────────────────
 --  Start
 -- ─────────────────────────────────────────────
@@ -1129,5 +1192,6 @@ local function energyLoop()  while running do drawEnergy()  ; sleep(5)   end end
 math.randomseed(os.time())
 playMelody("startup")
 box.sendMessage("J.A.R.V.I.S online. All systems nominal.", "Jarvis")
+pingSatellites()  -- discover any satellites already running
 
-parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop)
+parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop, satelliteLoop)
