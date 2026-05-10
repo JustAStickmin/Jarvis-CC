@@ -24,6 +24,7 @@ local CFG_LIGHTS  = nil   -- 1x1 lights status
 -- ─────────────────────────────────────────────
 --  Response tables
 -- ─────────────────────────────────────────────
+
 local greetings = {
     "Good day! How may I assist you?",
     "Hello! I am at your service.",
@@ -158,6 +159,7 @@ local uncommonWords = {
 -- ─────────────────────────────────────────────
 --  Speaker melodies
 -- ─────────────────────────────────────────────
+
 local melodies = {
     fanfare = {
         {"pling",    6,  0.10}, {"pling",  8,  0.10}, {"pling", 10, 0.10},
@@ -230,6 +232,7 @@ end
 --    clockMon  2×1  veryWide  (chars ~14×5)
 --    lightsMon 1×1  squarish  (chars   ~7×5)
 -- ─────────────────────────────────────────────
+
 local function detectMonitors()
     -- Pass 1: set scale on every monitor
     local names = {}
@@ -239,8 +242,10 @@ local function detectMonitors()
             table.insert(names, name)
         end
     end
+
     -- Wait for scale to take effect
     sleep(0.5)
+
     -- Pass 2: read sizes
     local raw = {}
     print(string.format("[JARVIS] %d monitor(s) found:", #names))
@@ -253,6 +258,7 @@ local function detectMonitors()
             h >= w * 1.5 and "PORTRAIT" or w >= h * 2 and "VERYWIDE" or "squarish"))
         table.insert(raw, {mon=m, w=w, h=h, area=area, name=name})
     end
+
     -- Bucket by shape
     local portrait, veryWide, squarish = {}, {}, {}
     for _, r in ipairs(raw) do
@@ -261,9 +267,11 @@ local function detectMonitors()
         else                          table.insert(squarish, r)
         end
     end
+
     table.sort(portrait,  function(a,b) return a.area > b.area end)
     table.sort(veryWide,  function(a,b) return a.area > b.area end)
     table.sort(squarish,  function(a,b) return a.area > b.area end)
+
     local function pick(t, i)
         return t[i] and t[i].mon or nil
     end
@@ -272,6 +280,7 @@ local function detectMonitors()
         local m = peripheral.wrap(name)
         return m
     end
+
     local result = {
         helpMon   = CFG_HELP   and pickByName(CFG_HELP)   or pick(squarish, 1),
         faceMon   = CFG_FACE   and pickByName(CFG_FACE)   or pick(squarish, 2),
@@ -281,6 +290,7 @@ local function detectMonitors()
         lastMon   = CFG_LAST   and pickByName(CFG_LAST)   or pick(portrait, 2),
         clockMon  = CFG_CLOCK  and pickByName(CFG_CLOCK)  or pick(veryWide, 1),
     }
+
     print("[JARVIS] Assignments:")
     for role, mon in pairs(result) do
         if mon then
@@ -290,6 +300,7 @@ local function detectMonitors()
             print(string.format("  %-12s  MISSING", role))
         end
     end
+
     return result
 end
 
@@ -338,11 +349,13 @@ local function flashLabels()
     end
     sleep(3)
 end
+
 flashLabels()
 
 -- ─────────────────────────────────────────────
 --  State
 -- ─────────────────────────────────────────────
+
 local lightsState  = false
 local lastResponse = "Awaiting command..."
 local hudTick      = 0
@@ -351,6 +364,7 @@ local speaking     = false
 -- ─────────────────────────────────────────────
 --  Helpers
 -- ─────────────────────────────────────────────
+
 local function fmtNum(n)
     n = math.floor(n)
     local s, result, offset = tostring(n), "", #tostring(n) % 3
@@ -394,6 +408,7 @@ end
 -- ─────────────────────────────────────────────
 --  Lights
 -- ─────────────────────────────────────────────
+
 local allSides = {"top","bottom","left","right","front","back"}
 
 local function drawLightsStatus()
@@ -426,6 +441,7 @@ end
 -- ─────────────────────────────────────────────
 --  Last response monitor
 -- ─────────────────────────────────────────────
+
 local function drawLastResponse()
     local mon = lastMon
     if not mon then return end
@@ -451,6 +467,7 @@ end
 -- ─────────────────────────────────────────────
 --  Help monitor
 -- ─────────────────────────────────────────────
+
 local helpSections = {
     { name = "GENERAL", col = colors.yellow, cmds = {
         {"jarvis",          "greet"},
@@ -505,6 +522,7 @@ local function drawHelp()
     mon.clear()
     centerWrite(mon, 1, "[ J.A.R.V.I.S COMMANDS ]", colors.cyan, colors.black)
     divider(mon, 2)
+
     local y = 3
     for _, sec in ipairs(helpSections) do
         if y > h then break end
@@ -529,12 +547,14 @@ end
 -- ─────────────────────────────────────────────
 --  Clock monitor
 -- ─────────────────────────────────────────────
+
 local function drawClock()
     local mon = clockMon
     if not mon then return end
     local w, h = mon.getSize()
     mon.setBackgroundColor(colors.black)
     mon.clear()
+
     local t    = os.time()
     local tStr = string.format("%02d:%02d", math.floor(t), math.floor((t % 1) * 60))
     local period, pCol
@@ -545,9 +565,11 @@ local function drawClock()
     elseif t < 22            then period, pCol = "Night",   colors.blue
     else                          period, pCol = "Predawn", colors.purple
     end
+
     centerWrite(mon, 1, tStr,           colors.white, colors.black)
     centerWrite(mon, 2, period,         pCol,         colors.black)
     centerWrite(mon, 3, "Day "..os.day(),colors.gray, colors.black)
+
     if h > 3 then
         local barW = w - 2
         local frac = (t % 24) / 24
@@ -582,12 +604,14 @@ end
 -- ─────────────────────────────────────────────
 --  Energy monitor
 -- ─────────────────────────────────────────────
+
 local function drawEnergy()
     local mon = energyMon
     if not mon then return end
     local w, h = mon.getSize()
     mon.setBackgroundColor(colors.black)
     mon.clear()
+
     local ok, stored, maxE, usage = pcall(function()
         return bridge.getEnergyStorage(), bridge.getMaxEnergyStorage(), bridge.getEnergyUsage()
     end)
@@ -596,46 +620,57 @@ local function drawEnergy()
         centerWrite(mon, math.floor(h/2)+1, "offline", colors.red, colors.black)
         return
     end
+
     local pct    = math.min(1.0, math.max(0.0, stored / maxE))
     local col    = pct > 0.6 and colors.green  or pct > 0.3 and colors.yellow
                    or pct > 0.15 and colors.orange or colors.red
     local status = pct > 0.6 and "FULL" or pct > 0.3 and "GOOD" or pct > 0.15 and "LOW" or "CRIT!"
+
     -- Layout: row 1 = nub, rows 2..batY2 = battery body, rows below = info
     local infoRows = 2
     local batY1   = 2
     local batY2   = h - infoRows
     local innerH  = math.max(1, batY2 - batY1 - 1)
     local innerW  = math.max(1, w - 2)
+
     -- Terminal nub (top centre, ~30% of width, 1 row tall)
     local nubW = math.max(2, math.floor(w * 0.30))
     local nubX = math.floor((w - nubW) / 2) + 1
     mon.setBackgroundColor(colors.lightGray)
     mon.setCursorPos(nubX, 1)
     mon.write(string.rep(" ", nubW))
+
     -- Top casing
     mon.setBackgroundColor(colors.lightGray)
     mon.setCursorPos(1, batY1)
     mon.write(string.rep(" ", w))
+
     -- Bottom casing
     mon.setCursorPos(1, batY2)
     mon.write(string.rep(" ", w))
+
     -- Interior rows — fill rises from the bottom
     local filled = math.floor(pct * innerH)
     for i = 1, innerH do
         local y      = batY1 + i
         local isFill = i > (innerH - filled)
+
         mon.setBackgroundColor(colors.lightGray)
         mon.setCursorPos(1, y) ; mon.write(" ")
+
         mon.setBackgroundColor(isFill and col or colors.black)
         mon.setCursorPos(2, y) ; mon.write(string.rep(" ", innerW))
+
         mon.setBackgroundColor(colors.lightGray)
         mon.setCursorPos(w, y) ; mon.write(" ")
     end
+
     -- Percentage text centred inside the battery body
     local midY  = batY1 + math.floor((batY2 - batY1) / 2)
     local midI  = midY - batY1          -- which interior row (1..innerH)
     local midFg = (midI > (innerH - filled)) and col or colors.black
     centerWrite(mon, midY, string.format("%d%%", math.floor(pct * 100)), colors.white, midFg)
+
     -- Info below the battery
     local iy = batY2 + 1
     centerWrite(mon, iy,     status,                        col,          colors.black)
@@ -645,14 +680,17 @@ end
 -- ─────────────────────────────────────────────
 --  Storage bar monitor
 -- ─────────────────────────────────────────────
+
 local function drawStorage()
     local mon = stoMon
     if not mon then return end
     local w, h = mon.getSize()
     mon.setBackgroundColor(colors.black)
     mon.clear()
+
     centerWrite(mon, 1, "[ STORAGE ]", colors.cyan, colors.black)
     divider(mon, 2)
+
     local ok, used, total, avail = pcall(function()
         return bridge.getUsedItemStorage(), bridge.getTotalItemStorage(), bridge.getAvailableItemStorage()
     end)
@@ -661,8 +699,10 @@ local function drawStorage()
         centerWrite(mon, 4, "offline",  colors.red, colors.black)
         return
     end
+
     local pct = used / total
     local col = pct < 0.6 and colors.green or pct < 0.85 and colors.yellow or colors.red
+
     -- Compact number formatter so text fits in ~14-char wide monitor
     local function short(n)
         n = math.floor(n)
@@ -670,12 +710,14 @@ local function drawStorage()
         elseif n >= 1000    then return string.format("%dk",   math.floor(n / 1000))
         else                     return tostring(n) end
     end
+
     -- Bar: rows 3 to h-3; bottom 3 rows reserved for stats
     local barY1  = 3
     local barY2  = h - 3
     local barH   = math.max(1, barY2 - barY1 + 1)
     local filled = math.floor(pct * barH)
     local midY   = barY1 + math.floor(barH / 2)
+
     for row = 0, barH - 1 do
         local y      = barY1 + row
         local isFill = (barH - 1 - row) < filled
@@ -683,8 +725,10 @@ local function drawStorage()
         mon.setCursorPos(1, y)
         mon.write(string.rep(" ", w))
     end
+
     local pctStr = string.format("%d%%", math.floor(pct * 100))
     centerWrite(mon, midY, pctStr, colors.white, nil)
+
     -- Stats: 3 rows at bottom
     mon.setBackgroundColor(colors.black)
     centerWrite(mon, h - 2, short(used).."/"..short(total), colors.white, colors.black)
@@ -695,6 +739,7 @@ end
 -- ─────────────────────────────────────────────
 --  JARVIS HUD
 -- ─────────────────────────────────────────────
+
 local function drawFace()
     local mon = faceMon
     if not mon then return end
@@ -703,24 +748,27 @@ local function drawFace()
     local cy   = math.floor(h / 2)
     local ar   = 0.45
     local t    = hudTick
+
     local pulse = speaking and math.floor(math.sin(t * 0.45) * 4) or 0
     local baseR = math.floor(math.min(w * 0.46, (h / ar) * 0.46))
+
     mon.setBackgroundColor(colors.black)
     mon.clear()
-    -- Returns a directional char for angle a — makes rings look curved
+
     local function curveChar(a)
         local s, c = math.sin(a), math.cos(a)
         local as, ac = math.abs(s), math.abs(c)
-        if     ac > as * 1.7  then return "-"
-        elseif as > ac * 1.7  then return "|"
-        elseif (s > 0) == (c > 0) then return "\\"
-        else   return "/"
+        if     ac > as * 1.7              then return "-"
+        elseif as > ac * 1.7              then return "|"
+        elseif (s > 0) == (c > 0)        then return "\\"
+        else                                   return "/"
         end
     end
+
     local function ring(rx, col, sym)
         if rx < 2 then return end
         local ry    = math.max(1, math.floor(rx * ar))
-        local steps = (rx + ry) * 4
+        local steps = (rx + ry) * 6
         mon.setTextColor(col)
         mon.setBackgroundColor(colors.black)
         for i = 0, steps do
@@ -733,10 +781,11 @@ local function drawFace()
             end
         end
     end
+
     local function arc(rx, a1, a2, col, sym)
         if rx < 2 then return end
         local ry    = math.max(1, math.floor(rx * ar))
-        local steps = (rx + ry) * 4
+        local steps = (rx + ry) * 6
         mon.setTextColor(col)
         mon.setBackgroundColor(colors.black)
         for i = 0, steps do
@@ -751,6 +800,7 @@ local function drawFace()
             end
         end
     end
+
     local function ticks(rx, col)
         if rx < 2 then return end
         mon.setTextColor(col)
@@ -767,41 +817,90 @@ local function drawFace()
             end
         end
     end
+
+    -- HUD corner brackets
+    local function corners(col)
+        mon.setTextColor(col)
+        mon.setBackgroundColor(colors.black)
+        local marks = {
+            {1,1,"+"},{2,1,"-"},{3,1,"-"},{1,2,"|"},{1,3,"|"},
+            {w,1,"+"},{w-1,1,"-"},{w-2,1,"-"},{w,2,"|"},{w,3,"|"},
+            {1,h,"+"},{2,h,"-"},{3,h,"-"},{1,h-1,"|"},{1,h-2,"|"},
+            {w,h,"+"},{w-1,h,"-"},{w-2,h,"-"},{w,h-1,"|"},{w,h-2,"|"},
+        }
+        for _, m in ipairs(marks) do
+            if m[1] >= 1 and m[1] <= w and m[2] >= 1 and m[2] <= h then
+                mon.setCursorPos(m[1], m[2]) ; mon.write(m[3])
+            end
+        end
+    end
+
     local r1 = baseR + pulse
     local r2 = math.floor(baseR * 0.82)
     local r3 = math.floor(baseR * 0.66)
     local r4 = math.floor(baseR * 0.48)
-    ring(r1, colors.cyan)           -- outer ring: curved - | / \ chars
-    ring(r2, colors.lightBlue)      -- second ring: curved chars
-    ring(r3, colors.cyan, ".")      -- third ring: dots
-    ring(r4, colors.blue, ":")      -- innermost ring: colons
-    ticks(r1, colors.cyan)          -- clock tick marks: + signs
+    local r5 = math.floor(baseR * 0.30)
+
+    ring(r1, colors.cyan)
+    ticks(r1, colors.cyan)
+    ring(r2, colors.lightBlue)
+    ring(r3, colors.cyan, ".")
+    ring(r4, colors.blue, ":")
+    ring(r5, colors.gray, ".")
+
+    -- Primary rotating arc on r2
     local arcSpeed  = speaking and 0.06 or 0.015
     local arcOffset = (t * arcSpeed) % (math.pi * 2)
     local arcLen    = math.pi * 0.38
-    arc(r2, arcOffset, arcOffset + arcLen, colors.orange, ">")
+    arc(r2, arcOffset,            arcOffset + arcLen,            colors.orange,    ">")
     arc(r2, arcOffset + math.pi, arcOffset + math.pi + arcLen * 0.4, colors.lightBlue, "<")
-    -- fill interior of innermost ring with black
-    local ir  = math.floor(r4 * 0.88)
+
+    -- Counter-rotating arc on r3
+    local arcOffset2 = (math.pi * 2) - (arcOffset * 0.7) % (math.pi * 2)
+    arc(r3, arcOffset2, arcOffset2 + arcLen * 0.35, colors.orange, "*")
+
+    -- Fill interior black
+    local ir  = math.floor(r5 * 0.85)
     local iry = math.max(1, math.floor(ir * ar))
-    for dy = -iry, iry do
-        for dx = -ir, ir do
-            if (dx / ir)^2 + (dy / iry)^2 <= 1 then
-                local px = cx + dx ; local py = cy + dy
-                if px >= 1 and px <= w and py >= 1 and py <= h then
-                    mon.setBackgroundColor(colors.black)
-                    mon.setCursorPos(px, py) ; mon.write(" ")
+    if ir >= 1 then
+        for dy = -iry, iry do
+            for dx = -ir, ir do
+                if (dx / ir)^2 + (dy / iry)^2 <= 1 then
+                    local px = cx + dx ; local py = cy + dy
+                    if px >= 1 and px <= w and py >= 1 and py <= h then
+                        mon.setBackgroundColor(colors.black)
+                        mon.setCursorPos(px, py) ; mon.write(" ")
+                    end
                 end
             end
         end
     end
+
+    -- Scanning line sweeps across center while speaking
+    if speaking and iry >= 1 then
+        local scanY = cy + math.floor(math.sin(t * 0.25) * iry)
+        local ratio = 1 - ((scanY - cy) / iry) ^ 2
+        local scanW = math.floor(ir * math.sqrt(math.max(0, ratio)))
+        mon.setTextColor(colors.cyan)
+        mon.setBackgroundColor(colors.black)
+        for dx = -scanW, scanW do
+            local px = cx + dx
+            if px >= 1 and px <= w and scanY >= 1 and scanY <= h then
+                mon.setCursorPos(px, scanY) ; mon.write("-")
+            end
+        end
+    end
+
+    corners(colors.cyan)
+
+    -- Center text
     local mainCol = speaking and colors.orange or colors.cyan
-    centerWrite(mon, cy - 1, "J.A.R.V.I.S.", mainCol, colors.black)
-    centerWrite(mon, cy,
-        speaking and "[ SPEAKING ]" or "[  ONLINE  ]",
-        speaking and colors.orange or colors.blue, colors.black)
+    centerWrite(mon, cy - 1, "J.A.R.V.I.S.", mainCol,                              colors.black)
+    centerWrite(mon, cy,     speaking and "[ SPEAKING ]" or "[  ONLINE  ]",
+                             speaking and colors.orange or colors.blue,             colors.black)
     local ts = string.format("%02d:%02d", math.floor(os.time()), math.floor((os.time() % 1) * 60))
-    centerWrite(mon, cy + 1, ts, colors.gray, colors.black)
+    centerWrite(mon, cy + 1, ts,            colors.gray,                            colors.black)
+
     hudTick = hudTick + 1
 end
 
@@ -811,6 +910,7 @@ local function drawHUD() drawFace() end
 -- ─────────────────────────────────────────────
 --  say()
 -- ─────────────────────────────────────────────
+
 local function say(msg)
     lastResponse = msg
     speaking = true
@@ -823,6 +923,7 @@ end
 -- ─────────────────────────────────────────────
 --  Shutdown
 -- ─────────────────────────────────────────────
+
 local function shutdownDisplay()
     for _, m in ipairs({helpMon,faceMon,stoMon,energyMon,lastMon,clockMon,lightsMon}) do
         if m then
@@ -841,13 +942,16 @@ end
 -- ─────────────────────────────────────────────
 --  Initial draws
 -- ─────────────────────────────────────────────
+
 drawHelp() ; drawLightsStatus() ; drawLastResponse()
 drawClock() ; drawEnergy() ; drawStorage() ; drawHUD()
 
 -- ─────────────────────────────────────────────
 --  Chat loop
 -- ─────────────────────────────────────────────
+
 local running = true
+
 local function chatLoop()
     while running do
         local _, user, rawMsg = os.pullEvent("chat")
@@ -855,7 +959,9 @@ local function chatLoop()
         local words = {}
         for w in msg:gmatch("%S+") do table.insert(words, w) end
         if words[1] ~= "jarvis" then goto continue end
+
         local cmd = words[2] and words[2]:lower() or nil
+
         if     cmd == nil           then say(greetings[math.random(#greetings)])
         elseif cmd == "time"        then
             local t=os.time()
@@ -876,12 +982,14 @@ local function chatLoop()
         elseif cmd == "define"      then
             local e = uncommonWords[math.random(#uncommonWords)]
             say(e[1]..": "..e[2])
+
         elseif cmd == "lights" then
             local sub = words[3] and words[3]:lower() or nil
             if     sub == "on"  then setAllLights(true)  ; say("Lights activated.")
             elseif sub == "off" then setAllLights(false) ; say("Lights deactivated.")
             else say("Specify 'lights on' or 'lights off'.")
             end
+
         elseif cmd == "energy" then
             local ok,s,m,u = pcall(function()
                 return bridge.getEnergyStorage(), bridge.getMaxEnergyStorage(), bridge.getEnergyUsage()
@@ -889,6 +997,7 @@ local function chatLoop()
             if ok then say(string.format("AE2 energy: %d%% (%s / %s AE). Usage: %s AE/t.",
                 math.floor((s/m)*100), fmtNum(s), fmtNum(m), fmtNum(u)))
             else say("ME Bridge offline. Cannot retrieve energy data.") end
+
         elseif cmd == "storage" then
             local ok,used,total,avail = pcall(function()
                 return bridge.getUsedItemStorage(), bridge.getTotalItemStorage(), bridge.getAvailableItemStorage()
@@ -896,12 +1005,14 @@ local function chatLoop()
             if ok then say(string.format("AE2 storage: %d%% full. %s used, %s free of %s total slots.",
                 math.floor((used/total)*100), fmtNum(used), fmtNum(avail), fmtNum(total)))
             else say("ME Bridge offline. Cannot retrieve storage data.") end
+
         elseif cmd == "items" then
             local ok, count = pcall(function()
                 local n=0 ; for _ in pairs(bridge.listItems()) do n=n+1 end ; return n
             end)
             if ok then say("The AE2 network holds "..fmtNum(count).." distinct item types.")
             else say("ME Bridge offline. Cannot retrieve item data.") end
+
         elseif cmd == "find" then
             local query = words[3] and words[3]:lower() or nil
             if not query then say("Specify an item. Usage: Jarvis find <item>")
@@ -920,6 +1031,7 @@ local function chatLoop()
                 elseif ok            then say("No items matching '"..query.."' found.")
                 else                      say("ME Bridge offline. Cannot search items.") end
             end
+
         elseif cmd == "network" then
             local ok, info = pcall(function()
                 local s=bridge.getEnergyStorage() ; local m=bridge.getMaxEnergyStorage()
@@ -928,21 +1040,27 @@ local function chatLoop()
                     math.floor((s/m)*100), math.floor((us/ts)*100))
             end)
             if ok then say("Network status: "..info) else say("ME Bridge offline.") end
+
         elseif cmd == "beep" then
             if spk then pcall(function() spk.playNote("pling",1,12) end) ; say("Beep.")
             else say("No speaker connected.") end
+
         elseif cmd == "alarm" then
             if spk then say("Sounding alarm!") ; playMelody("alarm")
             else say("No speaker connected.") end
+
         elseif cmd == "fanfare" then
             if spk then say("Fanfare!") ; playMelody("fanfare")
             else say("No speaker connected.") end
+
         elseif cmd == "music" then
             if spk then say("Playing a tune.") ; playMelody("music")
             else say("No speaker connected.") end
+
         elseif cmd == "victory" then
             if spk then say("Victory!") ; playMelody("victory")
             else say("No speaker connected.") end
+
         elseif cmd == "play" then
             local sound = words[3]
             if not spk then say("No speaker connected.")
@@ -951,9 +1069,11 @@ local function chatLoop()
                 local ok = pcall(function() spk.playSound(sound,1,1) end)
                 if ok then say("Playing: "..sound) else say("Could not play '"..sound.."'.") end
             end
+
         elseif cmd == "stop" then
             if spk then pcall(function() spk.stop() end) ; say("Audio stopped.")
             else say("No speaker connected.") end
+
         elseif cmd == "help"     then say("Commands are displayed on the help monitor.")
         elseif cmd == "shutdown" then
             say("Initiating shutdown sequence. Goodbye.")
@@ -963,6 +1083,7 @@ local function chatLoop()
         else
             say("Unrecognized command: '"..cmd.."'. Check the help monitor.")
         end
+
         ::continue::
     end
 end
@@ -970,6 +1091,7 @@ end
 -- ─────────────────────────────────────────────
 --  Background loops
 -- ─────────────────────────────────────────────
+
 local function hudLoop()     while running do drawHUD()     ; sleep(0.2) end end
 local function storageLoop() while running do drawStorage() ; sleep(5)   end end
 local function clockLoop()   while running do drawClock()   ; sleep(1)   end end
@@ -978,7 +1100,9 @@ local function energyLoop()  while running do drawEnergy()  ; sleep(5)   end end
 -- ─────────────────────────────────────────────
 --  Start
 -- ─────────────────────────────────────────────
+
 math.randomseed(os.time())
 playMelody("startup")
 box.sendMessage("J.A.R.V.I.S online. All systems nominal.", "Jarvis")
+
 parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop)
