@@ -640,6 +640,7 @@ local helpSections = {
     }},
     { name = "SYSTEM", col = colors.red, cmds = {
         {"help",            "show commands"},
+        {"altname <cmd>",   "show synonyms"},
         {"shutdown",        "go offline"},
     }},
 }
@@ -1077,6 +1078,55 @@ drawHelp() ; drawLightsStatus() ; drawLastResponse()
 drawClock() ; drawEnergy() ; drawStorage() ; drawHUD()
 
 -- ─────────────────────────────────────────────
+--  Synonyms
+--  Alternate names for commands. Typing any of these
+--  fires the canonical command. List them with
+--  'jarvis altname <command>'.
+-- ─────────────────────────────────────────────
+local synonyms = {
+    -- canonical = { synonyms }
+    time        = {"clock", "hour"},
+    day         = {"date"},
+    status      = {"sysinfo", "info", "report"},
+    threat      = {"danger", "risk"},
+    joke        = {"funny", "humor"},
+    quote       = {"say", "wisdom", "saying"},
+    shakespeare = {"bard"},
+    define      = {"word", "dict", "vocab"},
+    compliment  = {"praise", "nice"},
+    roast       = {"burn", "insult"},
+    warn        = {"warning", "alert"},
+    diagnose    = {"scan", "check"},
+    flip        = {"coin", "toss"},
+    roll        = {"dice"},
+    lights      = {"light", "lamp", "lamps"},
+    energy      = {"power", "ae", "battery"},
+    storage     = {"inventory", "stock", "stash"},
+    items       = {"types", "count"},
+    find        = {"search", "locate", "where"},
+    network     = {"net", "stats"},
+    beep        = {"ping"},
+    alarm       = {"siren"},
+    fanfare     = {"trumpet"},
+    music       = {"song", "tune"},
+    victory     = {"win", "yay"},
+    play        = {"sound"},
+    stop        = {"silence", "mute", "quiet"},
+    lite        = {"campfire", "fire", "torch"},
+    satellites  = {"sats", "links"},
+    help        = {"commands", "list", "menu"},
+    shutdown    = {"offline", "bye"},
+}
+
+-- Reverse lookup: synonym → canonical command
+local synonymToCanonical = {}
+for canonical, alts in pairs(synonyms) do
+    for _, alt in ipairs(alts) do
+        synonymToCanonical[alt] = canonical
+    end
+end
+
+-- ─────────────────────────────────────────────
 --  Chat loop
 -- ─────────────────────────────────────────────
 
@@ -1091,6 +1141,8 @@ local function chatLoop()
         if words[1] ~= "jarvis" then goto continue end
 
         local cmd = words[2] and words[2]:lower() or nil
+        -- Resolve synonyms to their canonical command
+        if cmd and synonymToCanonical[cmd] then cmd = synonymToCanonical[cmd] end
 
         if     cmd == nil           then say(greetings[math.random(#greetings)])
         elseif cmd == "time"        then
@@ -1218,6 +1270,20 @@ local function chatLoop()
             else say("No speaker connected.") end
 
         elseif cmd == "help"     then say("Commands are displayed on the help monitor.")
+        elseif cmd == "altname" then
+            local target = words[3] and words[3]:lower() or nil
+            if not target then
+                say("Usage: jarvis altname <command>. Lists alternate names.")
+            else
+                -- If the target is itself a synonym, resolve to canonical first
+                local canonical = synonymToCanonical[target] or target
+                local alts = synonyms[canonical]
+                if alts and #alts > 0 then
+                    say("'"..canonical.."' can also be: "..table.concat(alts, ", ")..".")
+                else
+                    say("'"..target.."' has no alternate names, or isn't a known command.")
+                end
+            end
         elseif cmd == "shutdown" then
             say("Initiating shutdown sequence. Goodbye.")
             if spk then playMelody("sad") end
