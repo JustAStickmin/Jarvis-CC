@@ -31,7 +31,9 @@ function M.parse(text)
                 if key then
                     local parts = {}
                     for p in value:gmatch("[^,]+") do
-                        table.insert(parts, p:gsub("^%s+", ""):gsub("%s+$", ""))
+                        -- Parens discard gsub's second return (count); without
+                        -- them table.insert treats it as a position arg and errors.
+                        table.insert(parts, (p:gsub("^%s+", ""):gsub("%s+$", "")))
                     end
                     local entry = {role = key:lower(), section = currentSection}
                     entry.name = parts[1]
