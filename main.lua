@@ -20,9 +20,39 @@ local function autogenMainConfig()
         else                           table.insert(squarish, r)
         end
     end
-    table.sort(portrait, function(a,b) return a.cw*a.ch > b.cw*b.ch end)
-    table.sort(veryWide, function(a,b) return a.cw*a.ch > b.cw*b.ch end)
-    table.sort(squarish, function(a,b) return a.cw*a.ch > b.cw*b.ch end)
+    -- Sub-bucket squarish by orientation so 5x4 (wider, face/help) and
+    -- 4x5 (taller) don't fight over the same slot.
+    local tallSq, wideSq, evenSq = {}, {}, {}
+    for _, r in ipairs(squarish) do
+        if     r.ch > r.cw then table.insert(tallSq, r)
+        elseif r.cw > r.ch then table.insert(wideSq, r)
+        else                    table.insert(evenSq, r)
+        end
+    end
+    local function byAreaDesc(a, b) return a.cw*a.ch > b.cw*b.ch end
+    local function byAreaAsc(a, b)  return a.cw*a.ch < b.cw*b.ch end
+    table.sort(portrait, byAreaDesc)
+    table.sort(veryWide, byAreaDesc)
+    table.sort(tallSq,   byAreaDesc)
+    table.sort(wideSq,   byAreaDesc)
+    table.sort(evenSq,   byAreaDesc)
+
+    local function take(t) return table.remove(t, 1) end
+
+    -- help & face want wider squarish (5x4). Take the two largest.
+    local helpMon = take(wideSq) or take(tallSq) or take(evenSq)
+    local faceMon = take(wideSq) or take(tallSq) or take(evenSq)
+    -- energy wants smallest wider squarish (3x2). Re-sort ascending.
+    table.sort(wideSq, byAreaAsc)
+    local energyMon = take(wideSq) or take(evenSq) or take(tallSq)
+    -- lights wants smallest even squarish (1x1).
+    table.sort(evenSq, byAreaAsc)
+    local lightsMon = take(evenSq) or take(wideSq) or take(tallSq)
+    -- storage = portrait. clock & last = very wide (both 4x1, same shape —
+    -- autogen guesses, user swaps in config.txt if needed).
+    local storageMon = take(portrait)
+    local clockMon   = take(veryWide)
+    local lastMon    = take(veryWide) or take(portrait)
 
     local function fmt(role, detected, defaultSize)
         local name = detected and detected.name or "monitor_x"
@@ -36,15 +66,19 @@ local function autogenMainConfig()
                  .. "# Run 'labels' to see each monitor's peripheralName.\n"
                  .. "# Edit lines below, save (Ctrl+S -> Exit), run 'main'.\n"
                  .. "# Delete this file and re-run 'main' to regenerate.\n"
+                 .. "#\n"
+                 .. "# When two monitors are the same shape (e.g. clock and\n"
+                 .. "# last are both 4x1), autogen may assign them backwards.\n"
+                 .. "# Run 'labels' to check, then swap the names if needed.\n"
                  .. "\n"
                  .. "-- Monitors (main) --\n"
-                 .. fmt("help",    squarish[1], "4x5") .. "\n"
-                 .. fmt("face",    squarish[2], "4x4") .. "\n"
-                 .. fmt("energy",  squarish[3], "3x3") .. "\n"
-                 .. fmt("lights",  squarish[4], "1x1") .. "\n"
-                 .. fmt("storage", portrait[1], "2x6") .. "\n"
-                 .. fmt("last",    portrait[2], "1x3") .. "\n"
-                 .. fmt("clock",   veryWide[1], "2x1") .. "\n"
+                 .. fmt("help",    helpMon,    "5x4") .. "\n"
+                 .. fmt("face",    faceMon,    "5x4") .. "\n"
+                 .. fmt("energy",  energyMon,  "3x2") .. "\n"
+                 .. fmt("lights",  lightsMon,  "1x1") .. "\n"
+                 .. fmt("storage", storageMon, "1x4") .. "\n"
+                 .. fmt("last",    lastMon,    "4x1") .. "\n"
+                 .. fmt("clock",   clockMon,   "4x1") .. "\n"
                  .. "\n"
                  .. "-- Peripherals --\n"
                  .. "chatBox:  auto\n"
@@ -66,13 +100,13 @@ local function find(role)
 end
 
 -- Monitor role assignments (nil → auto-detect by aspect ratio)
-local CFG_HELP    = find("help")     -- 4x5 commands list
-local CFG_FACE    = find("face")     -- 4x4 JARVIS HUD / spinning rings
-local CFG_STO     = find("storage")  -- 2x6 AE2 storage bar  (tall portrait)
-local CFG_ENERGY  = find("energy")   -- 3x3 AE2 energy bar
-local CFG_LAST    = find("last")     -- 1x3 last response     (tall portrait)
-local CFG_CLOCK   = find("clock")    -- 2x1 clock             (very wide)
-local CFG_LIGHTS  = find("lights")   -- 1x1 lights status
+local CFG_HELP    = find("help")     -- 5x4 commands list           (wider squarish)
+local CFG_FACE    = find("face")     -- 5x4 JARVIS HUD              (wider squarish)
+local CFG_STO     = find("storage")  -- 1x4 AE2 storage bar         (portrait)
+local CFG_ENERGY  = find("energy")   -- 3x2 AE2 energy bar          (wider squarish)
+local CFG_LAST    = find("last")     -- 4x1 last response           (very wide)
+local CFG_CLOCK   = find("clock")    -- 4x1 clock                   (very wide)
+local CFG_LIGHTS  = find("lights")   -- 1x1 lights status           (even squarish)
 
 -- Single-instance peripherals (config can override; otherwise auto-find)
 local chatBoxName  = find("chatBox")

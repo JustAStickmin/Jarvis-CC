@@ -27,15 +27,15 @@ Type `jarvis <command>` in Minecraft chat (within range of the chatBox) and JARV
 
 JARVIS auto-detects monitors by their aspect ratio, but you can override the assignments at the top of `main.lua` by setting the `CFG_*` variables to specific peripheral names like `"monitor_3"`.
 
-| Role | Suggested size | Purpose |
+| Role | Size (WxH) | Purpose |
 |---|---|---|
-| `helpMon` | 4×5 | Command list |
-| `faceMon` | 4×4 | JARVIS HUD with spinning rings |
-| `stoMon` | 2×6 (portrait) | AE2 storage bar |
-| `energyMon` | 3×3 | AE2 energy bar |
-| `lastMon` | 1×3 (portrait) | Last response display |
-| `clockMon` | 2×1 (very wide) | Minecraft clock |
-| `lightsMon` | 1×1 | Lights status |
+| `help` | 5×4 | Command list |
+| `face` | 5×4 | JARVIS HUD with spinning rings |
+| `energy` | 3×2 | AE2 energy bar |
+| `lights` | 1×1 | Lights status |
+| `storage` | 1×4 (portrait) | AE2 storage bar |
+| `last` | 4×1 (very wide) | Last response display |
+| `clock` | 4×1 (very wide) | Minecraft clock |
 
 ## Installing on your CC computer
 
