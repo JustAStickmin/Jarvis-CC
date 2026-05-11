@@ -71,6 +71,9 @@ saves/
 world/
 
 # Local JARVIS configs (each CC computer keeps its own assignments)
+config.txt
+satelliteconfig.txt
+# Old format — kept for safety in case any computer still has them
 config.lua
 satelliteconfig.lua
 

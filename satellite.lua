@@ -1,41 +1,58 @@
 -- satellite.lua  —  Runs on a satellite computer (separate from main JARVIS).
--- Loads satelliteconfig.lua to get its role + monitor, opens all modems
--- for rednet, and runs the animation/program for that role while listening
--- for commands from JARVIS.
+-- Reads satelliteconfig.txt for its role + monitor, opens all modems for
+-- rednet, and runs the per-role animation while listening for commands.
+--
+-- First run with no satelliteconfig.txt → autogenerates one with
+-- role="campfire" and the first detected monitor.
 --
 -- Setup on a satellite computer:
 --   1. wget run https://raw.githubusercontent.com/JustAStickmin/Jarvis-CC/main/update.lua
---   2. edit satelliteconfig.lua    -- set role + monitor
---   3. satellite
+--   2. satellite                          (creates satelliteconfig.txt)
+--   3. edit satelliteconfig.txt           (change role/monitor if needed)
+--   4. satellite                          (launch)
 
--- ─── Load satellite config ─────────────────────────────
-local function loadConfig()
-    if not fs.exists("satelliteconfig.lua") then
-        print("[SATELLITE] No satelliteconfig.lua. Run 'update' first, then edit it.")
-        return nil
-    end
-    local fn, err = loadfile("satelliteconfig.lua")
-    if not fn then
-        print("[SATELLITE] satelliteconfig.lua syntax error: "..tostring(err))
-        return nil
-    end
-    local ok, result = pcall(fn)
-    if not ok or type(result) ~= "table" then
-        print("[SATELLITE] satelliteconfig.lua did not return a table.")
-        return nil
-    end
-    return result
+local cfgio = dofile("cfgio.lua")
+
+-- ─── Autogen satelliteconfig.txt if missing ─────────────
+local function autogenSatelliteConfig()
+    print("[SATELLITE] No satelliteconfig.txt — detecting monitor...")
+    local mons = cfgio.detectMonitors()
+    local first = mons[1]
+    local nameStr = first and first.name  or "monitor_x"
+    local sizeStr = first and (first.bw.."x"..first.bh) or "3x3"
+
+    local content = "# JARVIS SATELLITE CONFIG\n"
+                 .. "# Format:  role: peripheralName, WxH\n"
+                 .. "#\n"
+                 .. "# Available roles: campfire\n"
+                 .. "# Run 'labels' to verify the monitor name.\n"
+                 .. "# Edit, save (Ctrl+S -> Exit), run 'satellite'.\n"
+                 .. "# Delete this file and re-run to regenerate.\n"
+                 .. "\n"
+                 .. "-- Monitors (satellites) --\n"
+                 .. string.format("%-9s %s, %s\n", "campfire:", nameStr, sizeStr)
+
+    cfgio.writeFile("satelliteconfig.txt", content)
+    print("[SATELLITE] Created satelliteconfig.txt with "..#mons.." monitor(s) detected.")
 end
 
-local config = loadConfig()
-if not config then return end
+if not fs.exists("satelliteconfig.txt") then
+    autogenSatelliteConfig()
+end
 
-local role = config.role
-if not role or role == "" then
-    print("[SATELLITE] No role set in satelliteconfig.lua.")
-    print("[SATELLITE] Edit satelliteconfig.lua and set role to e.g. \"campfire\".")
+-- ─── Parse config ──────────────────────────────────────
+local entries = cfgio.parseFile("satelliteconfig.txt") or {}
+
+-- A satellite has exactly one role; take the first entry under any section.
+local entry = entries[1]
+if not entry then
+    print("[SATELLITE] No role entry in satelliteconfig.txt.")
+    print("[SATELLITE] Edit it and add e.g.   campfire: monitor_0, 3x3")
     return
 end
+
+local role = entry.role
+local monitorName = entry.name
 
 -- ─── Open all modems ───────────────────────────────────
 local opened = {}
@@ -53,11 +70,11 @@ print("[SATELLITE] Opened modem(s): "..table.concat(opened, ", "))
 
 -- ─── Find monitor ──────────────────────────────────────
 local mon
-if config.monitor then
-    mon = peripheral.wrap(config.monitor)
+if monitorName then
+    mon = peripheral.wrap(monitorName)
     if not mon then
-        print("[SATELLITE] Monitor '"..config.monitor.."' not found.")
-        print("[SATELLITE] Run 'labels' to check the name, then edit satelliteconfig.lua.")
+        print("[SATELLITE] Monitor '"..monitorName.."' not found.")
+        print("[SATELLITE] Run 'labels' and edit satelliteconfig.txt.")
         return
     end
 else
@@ -65,8 +82,6 @@ else
 end
 if not mon then
     print("[SATELLITE] No monitor connected.")
-    print("[SATELLITE] Attach one and run 'labels' to get its peripheral name,")
-    print("[SATELLITE] then set monitor in satelliteconfig.lua.")
     return
 end
 
@@ -84,13 +99,12 @@ if not ok or type(mod) ~= "table" then
 end
 
 -- ─── Initialise ───────────────────────────────────────
-if mod.init then mod.init(mon, config) end
+if mod.init then mod.init(mon, entry) end
 print("[SATELLITE] Online.")
 print("  Role:    "..role)
+print("  Monitor: "..tostring(monitorName or "(auto)"))
 print("  ID:      "..os.getComputerID())
-print("  Module:  "..modulePath)
 
--- Announce ourselves to JARVIS
 rednet.broadcast({type = "hello", role = role, id = os.getComputerID()}, "jarvis")
 
 -- ─── Loops ────────────────────────────────────────────

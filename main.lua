@@ -1,25 +1,86 @@
 -- JARVIS - CC: Tweaked AI Assistant
 -- Peripherals: chatBox, meBridge, redstoneIntegrator x N, speaker, 7 monitors
 
-local box    = peripheral.find("chatBox")
-local bridge = peripheral.find("meBridge")
-local spk    = peripheral.find("speaker")
+-- ═══════════════════════════════════════════════════════
+--  CONFIG
+--  Loads peripheral assignments from config.txt.
+--  Auto-generates the file on first run by detecting
+--  monitors and assigning them by aspect ratio.
+--  Edit config.txt to customize. Delete it to regenerate.
+-- ═══════════════════════════════════════════════════════
+local cfgio = dofile("cfgio.lua")
 
--- ═══════════════════════════════════════════════════════
---  MONITOR CONFIG
---  If auto-detection assigns monitors incorrectly, set the
---  peripheral names here (e.g. "monitor_0").
---  Run the script once to see each monitor's name flashed
---  on screen and printed to the terminal, then fill these in.
---  Leave as nil to use auto-detection.
--- ═══════════════════════════════════════════════════════
-local CFG_HELP    = nil   -- 4x5 commands list
-local CFG_FACE    = nil   -- 4x4 JARVIS HUD / spinning rings
-local CFG_STO     = nil   -- 2x6 AE2 storage bar  (tall portrait)
-local CFG_ENERGY  = nil   -- 3x3 AE2 energy bar
-local CFG_LAST    = nil   -- 1x3 last response     (tall portrait)
-local CFG_CLOCK   = nil   -- 2x1 clock             (very wide)
-local CFG_LIGHTS  = nil   -- 1x1 lights status
+local function autogenMainConfig()
+    print("[JARVIS] No config.txt — detecting monitors to generate one...")
+    local mons = cfgio.detectMonitors()
+    local portrait, veryWide, squarish = {}, {}, {}
+    for _, r in ipairs(mons) do
+        if     r.ch >= r.cw * 1.5 then table.insert(portrait, r)
+        elseif r.cw >= r.ch * 2   then table.insert(veryWide, r)
+        else                           table.insert(squarish, r)
+        end
+    end
+    table.sort(portrait, function(a,b) return a.cw*a.ch > b.cw*b.ch end)
+    table.sort(veryWide, function(a,b) return a.cw*a.ch > b.cw*b.ch end)
+    table.sort(squarish, function(a,b) return a.cw*a.ch > b.cw*b.ch end)
+
+    local function fmt(role, detected, defaultSize)
+        local name = detected and detected.name or "monitor_x"
+        local size = detected and (detected.bw.."x"..detected.bh) or defaultSize
+        return string.format("%-9s %s, %s", role..":", name, size)
+    end
+
+    local content = "# JARVIS CONFIG  (Main Computer)\n"
+                 .. "# Format:  role: peripheralName, WxH\n"
+                 .. "#\n"
+                 .. "# Run 'labels' to see each monitor's peripheralName.\n"
+                 .. "# Edit lines below, save (Ctrl+S -> Exit), run 'main'.\n"
+                 .. "# Delete this file and re-run 'main' to regenerate.\n"
+                 .. "\n"
+                 .. "-- Monitors (main) --\n"
+                 .. fmt("help",    squarish[1], "4x5") .. "\n"
+                 .. fmt("face",    squarish[2], "4x4") .. "\n"
+                 .. fmt("energy",  squarish[3], "3x3") .. "\n"
+                 .. fmt("lights",  squarish[4], "1x1") .. "\n"
+                 .. fmt("storage", portrait[1], "2x6") .. "\n"
+                 .. fmt("last",    portrait[2], "1x3") .. "\n"
+                 .. fmt("clock",   veryWide[1], "2x1") .. "\n"
+                 .. "\n"
+                 .. "-- Peripherals --\n"
+                 .. "chatBox:  auto\n"
+                 .. "meBridge: auto\n"
+                 .. "speaker:  auto\n"
+
+    cfgio.writeFile("config.txt", content)
+    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) detected.")
+end
+
+if not fs.exists("config.txt") then
+    autogenMainConfig()
+end
+
+local entries = cfgio.parseFile("config.txt") or {}
+local function find(role)
+    local e = cfgio.findEntry(entries, role)
+    return e and e.name or nil
+end
+
+-- Monitor role assignments (nil → auto-detect by aspect ratio)
+local CFG_HELP    = find("help")     -- 4x5 commands list
+local CFG_FACE    = find("face")     -- 4x4 JARVIS HUD / spinning rings
+local CFG_STO     = find("storage")  -- 2x6 AE2 storage bar  (tall portrait)
+local CFG_ENERGY  = find("energy")   -- 3x3 AE2 energy bar
+local CFG_LAST    = find("last")     -- 1x3 last response     (tall portrait)
+local CFG_CLOCK   = find("clock")    -- 2x1 clock             (very wide)
+local CFG_LIGHTS  = find("lights")   -- 1x1 lights status
+
+-- Single-instance peripherals (config can override; otherwise auto-find)
+local chatBoxName  = find("chatBox")
+local meBridgeName = find("meBridge")
+local speakerName  = find("speaker")
+local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or peripheral.find("chatBox")
+local bridge = meBridgeName and peripheral.wrap(meBridgeName) or peripheral.find("meBridge")
+local spk    = speakerName  and peripheral.wrap(speakerName)  or peripheral.find("speaker")
 
 -- ═══════════════════════════════════════════════════════
 --  SATELLITE COMMS
