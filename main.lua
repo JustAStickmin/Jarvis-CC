@@ -115,11 +115,10 @@ local function autogenMainConfig()
         .. "talk:    "..rsTalk.."\n"
         .. "\n"
         .. "-- Inputs --\n"
-        .. "# scroll : the scroller pane peripheral (CC:Create Bridge), or any\n"
-        .. "#          peripheral that exposes a 0-15 value. JARVIS uses it to\n"
-        .. "#          pick which help page is shown (0 = command list).\n"
-        .. "#          If your scroller emits a wider range (0-100, 0-255),\n"
-        .. "#          values are clamped to 0-15.\n"
+        .. "# scroll : the scroller pane peripheral (CC:Create Bridge).\n"
+        .. "#          JARVIS auto-configures it on startup: setLimit(15)\n"
+        .. "#          and disables the minus spectrum, so getValue()\n"
+        .. "#          returns 0..15 matching the help pages.\n"
         .. "scroll:  "..rsScroll.."\n"
 
     cfgio.writeFile("config.txt", content)
@@ -156,10 +155,24 @@ local spk    = speakerName  and peripheral.wrap(speakerName)  or peripheral.find
 -- Redstone integrators (each role is its own integrator).
 local lightsRIName   = find("light")    -- lights on/off
 local talkRIName     = find("talk")     -- ON while speaking
-local scrollerRIName = find("scroll")   -- analog 0-15 input picks help page
+local scrollerRIName = find("scroll")   -- 0-15 input picks help page
 local lightsRI       = lightsRIName   and peripheral.wrap(lightsRIName)
 local talkRI         = talkRIName     and peripheral.wrap(talkRIName)
 local scrollerRI     = scrollerRIName and peripheral.wrap(scrollerRIName)
+
+-- Configure the scroller so getValue() returns clean 0-15 matching the
+-- 16 help pages. Safe on any peripheral — missing methods are skipped.
+if scrollerRI then
+    if scrollerRI.setLimit then
+        pcall(scrollerRI.setLimit, scrollerRI, 15)
+    end
+    if scrollerRI.hasMinusSpectrum and scrollerRI.toggleMinusSpectrum then
+        local ok, hasMinus = pcall(scrollerRI.hasMinusSpectrum, scrollerRI)
+        if ok and hasMinus then
+            pcall(scrollerRI.toggleMinusSpectrum, scrollerRI)
+        end
+    end
+end
 
 -- ─── Config diagnostics ──────────────────────────────
 -- Print what the config file actually contains so the user can verify
@@ -749,6 +762,19 @@ local helpSections = {
     }},
 }
 
+-- Writes "[ N ]" pinned to the bottom-right of the help monitor.
+-- Shared by drawHelp (page 0) and drawHelpPage (pages 1-15).
+local function drawPageLabel(mon, n)
+    if not mon then return end
+    local w, h = mon.getSize()
+    if h < 1 then return end
+    local label = "[ "..n.." ]"
+    mon.setTextColor(colors.gray)
+    mon.setBackgroundColor(colors.black)
+    mon.setCursorPos(math.max(1, w - #label + 1), h)
+    mon.write(label)
+end
+
 local function drawHelp()
     local mon = helpMon
     if not mon then return end
@@ -758,16 +784,18 @@ local function drawHelp()
     centerWrite(mon, 1, "[ J.A.R.V.I.S COMMANDS ]", colors.cyan, colors.black)
     divider(mon, 2)
 
+    -- Reserve the bottom row for the "[ 0 ]" page label.
+    local maxY = h - 1
     local y = 3
     for _, sec in ipairs(helpSections) do
-        if y > h then break end
+        if y > maxY then break end
         mon.setTextColor(sec.col)
         mon.setBackgroundColor(colors.black)
         mon.setCursorPos(1, y)
         mon.write("[ "..sec.name.." ]")
         y = y + 1
         for _, cmd in ipairs(sec.cmds) do
-            if y > h then break end
+            if y > maxY then break end
             mon.setTextColor(colors.lightBlue)
             mon.setBackgroundColor(colors.black)
             mon.setCursorPos(1, y)
@@ -777,16 +805,8 @@ local function drawHelp()
         end
         y = y + 1
     end
-    -- Scroll hint at the bottom (only if a scroller integrator is connected)
-    if scrollerRI and h >= 4 then
-        mon.setTextColor(colors.gray)
-        mon.setBackgroundColor(colors.black)
-        mon.setCursorPos(1, h)
-        local hint = "scroll: 0/15"
-        local x = math.max(1, math.floor((w - #hint) / 2) + 1)
-        mon.setCursorPos(x, h)
-        mon.write(hint)
-    end
+
+    drawPageLabel(mon, 0)
 end
 
 -- Multi-page help.  Page 0 is the live command list.  Pages 1-15 are
@@ -808,14 +828,7 @@ local function drawHelpPage(n)
     centerWrite(mon, mid + 1, "Suggest content",  colors.lightGray, colors.black)
     centerWrite(mon, mid + 2, "in the Discord",   colors.lightGray, colors.black)
     centerWrite(mon, mid + 3, "JARVIS thread!",   colors.lightGray, colors.black)
-    if h >= 6 then
-        mon.setTextColor(colors.gray)
-        mon.setBackgroundColor(colors.black)
-        local hint = "scroll: "..n.."/15"
-        local x = math.max(1, math.floor((w - #hint) / 2) + 1)
-        mon.setCursorPos(x, h)
-        mon.write(hint)
-    end
+    drawPageLabel(mon, n)
 end
 
 -- ─────────────────────────────────────────────
