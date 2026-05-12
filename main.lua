@@ -93,11 +93,11 @@ local function autogenMainConfig()
         end
     end
     -- Scroller is a separate peripheral (CC:Create Bridge "scroller pane",
-    -- or any peripheral whose type contains "scroll").
+    -- or any peripheral whose type OR name contains "scroll").
     local scrollerCandidate = nil
     for _, name in ipairs(peripheral.getNames()) do
-        local t = peripheral.getType(name) or ""
-        if t:lower():find("scroll", 1, true) then
+        local t = (peripheral.getType(name) or ""):lower()
+        if t:find("scroll", 1, true) or name:lower():find("scroll", 1, true) then
             scrollerCandidate = name
             break
         end
@@ -163,15 +163,28 @@ local scrollerRI     = scrollerRIName and peripheral.wrap(scrollerRIName)
 -- Configure the scroller so getValue() returns clean 0-15 matching the
 -- 16 help pages. Safe on any peripheral — missing methods are skipped.
 if scrollerRI then
+    local methods = {}
     if scrollerRI.setLimit then
-        pcall(scrollerRI.setLimit, scrollerRI, 15)
+        local ok = pcall(scrollerRI.setLimit, scrollerRI, 15)
+        if ok then table.insert(methods, "setLimit(15)") end
     end
     if scrollerRI.hasMinusSpectrum and scrollerRI.toggleMinusSpectrum then
         local ok, hasMinus = pcall(scrollerRI.hasMinusSpectrum, scrollerRI)
         if ok and hasMinus then
             pcall(scrollerRI.toggleMinusSpectrum, scrollerRI)
+            table.insert(methods, "minusSpectrum=off")
         end
     end
+    -- Report initial value so user can see the scroller is alive
+    local startVal = "?"
+    if scrollerRI.getValue then
+        local ok, v = pcall(scrollerRI.getValue, scrollerRI)
+        if ok then startVal = tostring(v) end
+    end
+    print("[JARVIS] Scroller "..tostring(scrollerRIName).." initialized. "
+        ..table.concat(methods, ", ").." (current value: "..startVal..")")
+elseif scrollerRIName then
+    print("[JARVIS] WARNING: scroller name '"..scrollerRIName.."' did not wrap as a peripheral.")
 end
 
 -- ─── Config diagnostics ──────────────────────────────
@@ -1557,13 +1570,15 @@ end
 -- Polls the scroller and redraws the help monitor when the value changes.
 -- Prints each new value so you can see your peripheral's actual range.
 local function scrollerLoop()
-    local lastVal = -1
+    local lastVal = nil    -- nil so the very first read always triggers a draw
     while running do
         if scrollerRI then
             local val = readScrollerValue()
             if val ~= lastVal then
                 lastVal = val
-                print(string.format("[JARVIS] scroller value: %s", tostring(val)))
+                print(string.format("[JARVIS] scroller value: %s -> page %d",
+                    tostring(val),
+                    math.max(0, math.min(15, math.floor(val or 0)))))
                 drawHelpPage(val)
             end
         end
