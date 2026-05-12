@@ -740,8 +740,9 @@ local helpSections = {
         {"roll",            "dice roll"},
     }},
     { name = "LIGHTS", col = colors.orange, cmds = {
-        {"lights on",       "lights on"},
-        {"lights off",      "lights off"},
+        {"lights",          "toggle"},
+        {"lights on",       "force on"},
+        {"lights off",      "force off"},
     }},
     { name = "AE2 NETWORK", col = colors.green, cmds = {
         {"energy",          "AE2 energy"},
@@ -1363,7 +1364,10 @@ local function chatLoop()
             local sub = words[3] and words[3]:lower() or nil
             if     sub == "on"  then setAllLights(true)  ; say("Lights activated.")
             elseif sub == "off" then setAllLights(false) ; say("Lights deactivated.")
-            else say("Specify 'lights on' or 'lights off'.")
+            elseif sub == nil   then
+                setAllLights(not lightsState)
+                say(lightsState and "Lights activated." or "Lights deactivated.")
+            else say("Usage: jarvis lights [on|off]. Bare 'jarvis lights' toggles.")
             end
 
         elseif cmd == "energy" then
