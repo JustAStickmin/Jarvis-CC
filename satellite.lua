@@ -54,6 +54,15 @@ end
 local role = entry.role
 local monitorName = entry.name
 
+print("[SATELLITE] Loaded satelliteconfig.txt:")
+print(string.format("  role    -> %s", role))
+print(string.format("  monitor -> %s", monitorName or "(auto-detect)"))
+if monitorName and not peripheral.wrap(monitorName) then
+    print("[SATELLITE] WARNING: \""..monitorName.."\" is not a real peripheral.")
+    print("[SATELLITE]          Run 'labels' and update satelliteconfig.txt.")
+    print("[SATELLITE]          Falling back to auto-detect.")
+end
+
 -- ─── Open all modems ───────────────────────────────────
 local opened = {}
 for _, name in ipairs(peripheral.getNames()) do
@@ -115,14 +124,17 @@ local function listenLoop()
         local id, msg = rednet.receive("jarvis")
         if type(msg) == "table" then
             if msg.target == role or msg.target == "all" then
-                if     msg.cmd == "toggle" and mod.toggle then mod.toggle()
-                elseif msg.cmd == "on"     and mod.setOn  then mod.setOn()
-                elseif msg.cmd == "off"    and mod.setOff then mod.setOff()
-                elseif msg.cmd == "ping" then
-                    rednet.send(id, {type = "pong", role = role, id = os.getComputerID()}, "jarvis")
-                elseif mod.handleCommand then
-                    mod.handleCommand(msg, id)
-                end
+                local ok, err = pcall(function()
+                    if     msg.cmd == "toggle" and mod.toggle then mod.toggle()
+                    elseif msg.cmd == "on"     and mod.setOn  then mod.setOn()
+                    elseif msg.cmd == "off"    and mod.setOff then mod.setOff()
+                    elseif msg.cmd == "ping" then
+                        rednet.send(id, {type = "pong", role = role, id = os.getComputerID()}, "jarvis")
+                    elseif mod.handleCommand then
+                        mod.handleCommand(msg, id)
+                    end
+                end)
+                if not ok then print("[SATELLITE] handler error: "..tostring(err)) end
             end
         end
     end

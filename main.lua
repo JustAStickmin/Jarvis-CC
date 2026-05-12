@@ -116,6 +116,40 @@ local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or peripheral.find
 local bridge = meBridgeName and peripheral.wrap(meBridgeName) or peripheral.find("meBridge")
 local spk    = speakerName  and peripheral.wrap(speakerName)  or peripheral.find("speaker")
 
+-- ─── Config diagnostics ──────────────────────────────
+-- Print what the config file actually contains so the user can verify
+-- it's being read, and warn loudly if any peripheral name doesn't exist.
+if #entries > 0 then
+    print("[JARVIS] Loaded config.txt ("..#entries.." entries):")
+    for _, e in ipairs(entries) do
+        local sizeStr = (e.w and e.h) and ("  ("..e.w.."x"..e.h..")") or ""
+        local nameStr = e.name or "(auto-detect)"
+        print(string.format("  %-9s -> %s%s", e.role, nameStr, sizeStr))
+    end
+else
+    print("[JARVIS] config.txt is empty or unreadable. All roles will auto-detect.")
+end
+
+-- Verify each configured name actually exists on the network
+local function verifyName(role, name)
+    if not name then return end
+    if not peripheral.wrap(name) then
+        print("[JARVIS] WARNING: \""..name.."\" (for "..role..") is not a real peripheral.")
+        print("[JARVIS]          Run 'labels' to see real names, then edit config.txt.")
+        print("[JARVIS]          Falling back to auto-detect for this role.")
+    end
+end
+verifyName("help",     CFG_HELP)
+verifyName("face",     CFG_FACE)
+verifyName("storage",  CFG_STO)
+verifyName("energy",   CFG_ENERGY)
+verifyName("last",     CFG_LAST)
+verifyName("clock",    CFG_CLOCK)
+verifyName("lights",   CFG_LIGHTS)
+verifyName("chatBox",  chatBoxName)
+verifyName("meBridge", meBridgeName)
+verifyName("speaker",  speakerName)
+
 -- ═══════════════════════════════════════════════════════
 --  SATELLITE COMMS
 --  Open every modem on the computer and listen on the
@@ -379,35 +413,51 @@ local function detectMonitors()
     table.sort(veryWide,  function(a,b) return a.area > b.area end)
     table.sort(squarish,  function(a,b) return a.area > b.area end)
 
-    local function pick(t, i)
-        return t[i] and t[i].mon or nil
-    end
-    local function pickByName(name)
-        if not name then return nil end
-        local m = peripheral.wrap(name)
-        return m
+    -- Each resolve returns (monitor, name, source) so we can print clearly.
+    local function resolve(cfg, bucket, idx)
+        if cfg then
+            local m = peripheral.wrap(cfg)
+            if m then return m, cfg, "config" end
+        end
+        local r = bucket[idx]
+        if r then return r.mon, r.name, "auto" end
+        return nil, nil, "missing"
     end
 
-    local result = {
-        helpMon   = CFG_HELP   and pickByName(CFG_HELP)   or pick(squarish, 1),
-        faceMon   = CFG_FACE   and pickByName(CFG_FACE)   or pick(squarish, 2),
-        energyMon = CFG_ENERGY and pickByName(CFG_ENERGY) or pick(squarish, 3),
-        lightsMon = CFG_LIGHTS and pickByName(CFG_LIGHTS) or pick(squarish, 4),
-        stoMon    = CFG_STO    and pickByName(CFG_STO)    or pick(portrait, 1),
-        lastMon   = CFG_LAST   and pickByName(CFG_LAST)   or pick(portrait, 2),
-        clockMon  = CFG_CLOCK  and pickByName(CFG_CLOCK)  or pick(veryWide, 1),
+    local result    = {}
+    local nameOf    = {}
+    local sourceOf  = {}
+    local assigns = {
+        {"helpMon",   CFG_HELP,   squarish, 1},
+        {"faceMon",   CFG_FACE,   squarish, 2},
+        {"energyMon", CFG_ENERGY, squarish, 3},
+        {"lightsMon", CFG_LIGHTS, squarish, 4},
+        {"stoMon",    CFG_STO,    portrait, 1},
+        {"lastMon",   CFG_LAST,   portrait, 2},
+        {"clockMon",  CFG_CLOCK,  veryWide, 1},
     }
+    for _, a in ipairs(assigns) do
+        local mon, name, src = resolve(a[2], a[3], a[4])
+        result[a[1]]   = mon
+        nameOf[a[1]]   = name
+        sourceOf[a[1]] = src
+    end
 
     print("[JARVIS] Assignments:")
-    for role, mon in pairs(result) do
+    for _, a in ipairs(assigns) do
+        local role = a[1]
+        local mon  = result[role]
         if mon then
             local w, h = mon.getSize()
-            print(string.format("  %-12s  %dx%d", role, w, h))
+            print(string.format("  %-10s  %-12s  %dx%d  (%s)",
+                role, nameOf[role] or "?", w, h, sourceOf[role]))
         else
-            print(string.format("  %-12s  MISSING", role))
+            print(string.format("  %-10s  MISSING", role))
         end
     end
 
+    result._nameOf   = nameOf
+    result._sourceOf = sourceOf
     return result
 end
 
@@ -419,11 +469,13 @@ local energyMon= mons.energyMon
 local lastMon  = mons.lastMon
 local clockMon = mons.clockMon
 local lightsMon= mons.lightsMon
+local monNames = mons._nameOf   or {}  -- role → peripheralName, for `jarvis config`
+local monSrc   = mons._sourceOf or {}  -- role → "config" | "auto" | "missing"
 
 -- Apply scales
 if helpMon    then helpMon.setTextScale(0.5)    end
 if faceMon    then faceMon.setTextScale(0.5)    end
-if stoMon     then stoMon.setTextScale(1)       end
+if stoMon     then stoMon.setTextScale(0.5)     end
 if energyMon  then energyMon.setTextScale(0.5)  end
 if lastMon    then lastMon.setTextScale(0.5)    end
 if clockMon   then clockMon.setTextScale(0.5)   end
@@ -490,8 +542,10 @@ end
 -- ─────────────────────────────────────────────
 
 local function fmtNum(n)
+    if type(n) ~= "number" then return tostring(n) end
     n = math.floor(n)
-    local s, result, offset = tostring(n), "", #tostring(n) % 3
+    local s = tostring(n)
+    local result, offset = "", #s % 3
     for i = 1, #s do
         if i > 1 and (i - 1 - offset) % 3 == 0 then result = result .. "," end
         result = result .. s:sub(i, i)
@@ -640,6 +694,7 @@ local helpSections = {
     }},
     { name = "SYSTEM", col = colors.red, cmds = {
         {"help",            "show commands"},
+        {"config",          "show monitor map"},
         {"altname <cmd>",   "show synonyms"},
         {"shutdown",        "go offline"},
     }},
@@ -688,13 +743,17 @@ local function drawClock()
 
     local t    = os.time()
     local tStr = string.format("%02d:%02d", math.floor(t), math.floor((t % 1) * 60))
+    -- CC os.time(): 0=midnight, 6=dawn, 12=noon, 18=dusk, 24=midnight.
     local period, pCol
-    if     t >= 23 or t < 1 then period, pCol = "Sunrise", colors.orange
-    elseif t < 12            then period, pCol = "Day",     colors.yellow
-    elseif t < 13            then period, pCol = "Sunset",  colors.orange
-    elseif t < 14            then period, pCol = "Dusk",    colors.red
-    elseif t < 22            then period, pCol = "Night",   colors.blue
-    else                          period, pCol = "Predawn", colors.purple
+    if     t < 5                  then period, pCol = "Night",    colors.blue
+    elseif t < 6                  then period, pCol = "Predawn",  colors.purple
+    elseif t < 7                  then period, pCol = "Sunrise",  colors.orange
+    elseif t < 12                 then period, pCol = "Morning",  colors.yellow
+    elseif t < 13                 then period, pCol = "Noon",     colors.yellow
+    elseif t < 18                 then period, pCol = "Afternoon",colors.yellow
+    elseif t < 19                 then period, pCol = "Sunset",   colors.orange
+    elseif t < 20                 then period, pCol = "Dusk",     colors.red
+    else                               period, pCol = "Night",    colors.blue
     end
 
     centerWrite(mon, 1, tStr,           colors.white, colors.black)
@@ -805,7 +864,7 @@ local function drawEnergy()
     -- Info below the battery
     local iy = batY2 + 1
     centerWrite(mon, iy,     status,                        col,          colors.black)
-    centerWrite(mon, iy + 1, fmtNum(math.floor(usage)).."AE/t", colors.gray, colors.black)
+    centerWrite(mon, iy + 1, fmtNum(math.floor(usage or 0)).."AE/t", colors.gray, colors.black)
 end
 
 -- ─────────────────────────────────────────────
@@ -825,11 +884,12 @@ local function drawStorage()
     local ok, used, total, avail = pcall(function()
         return bridge.getUsedItemStorage(), bridge.getTotalItemStorage(), bridge.getAvailableItemStorage()
     end)
-    if not ok then
+    if not ok or not used or not total or total == 0 then
         centerWrite(mon, 3, "Bridge",   colors.red, colors.black)
         centerWrite(mon, 4, "offline",  colors.red, colors.black)
         return
     end
+    avail = avail or (total - used)
 
     local pct = used / total
     local col = pct < 0.6 and colors.green or pct < 0.85 and colors.yellow or colors.red
@@ -917,11 +977,18 @@ local function drawFace()
         if rx < 2 then return end
         local ry    = math.max(1, math.floor(rx * ar))
         local steps = (rx + ry) * 6
+        local TWO_PI = math.pi * 2
+        -- Normalize a1, a2 into [0, 2π). If a2 < a1 after normalizing, the
+        -- arc wraps past 0 (e.g. 1.9π → 0.3π).
+        a1 = a1 % TWO_PI
+        a2 = a2 % TWO_PI
+        local wraps = a2 < a1
         mon.setTextColor(col)
         mon.setBackgroundColor(colors.black)
         for i = 0, steps do
-            local a = (i / steps) * math.pi * 2
-            if a >= a1 and a <= a2 then
+            local a = (i / steps) * TWO_PI
+            local inArc = wraps and (a >= a1 or a <= a2) or (a >= a1 and a <= a2)
+            if inArc then
                 local px = cx + math.floor(math.cos(a) * rx + 0.5)
                 local py = cy + math.floor(math.sin(a) * ry + 0.5)
                 if px >= 1 and px <= w and py >= 1 and py <= h then
@@ -986,8 +1053,9 @@ local function drawFace()
     arc(r2, arcOffset,            arcOffset + arcLen,            colors.orange,    ">")
     arc(r2, arcOffset + math.pi, arcOffset + math.pi + arcLen * 0.4, colors.lightBlue, "<")
 
-    -- Counter-rotating arc on r3
-    local arcOffset2 = (math.pi * 2) - (arcOffset * 0.7) % (math.pi * 2)
+    -- Counter-rotating arc on r3 (parens force the subtraction before modulo —
+    -- without them, `%` would bind tighter and produce a degenerate range).
+    local arcOffset2 = ((math.pi * 2) - arcOffset * 0.7) % (math.pi * 2)
     arc(r3, arcOffset2, arcOffset2 + arcLen * 0.35, colors.orange, "*")
 
     -- Fill interior black
@@ -1045,7 +1113,7 @@ local function drawHUD() drawFace() end
 local function say(msg)
     lastResponse = msg
     speaking = true
-    box.sendMessage(msg, "Jarvis")
+    if box then pcall(function() box.sendMessage(msg, "Jarvis") end) end
     drawLastResponse()
     sleep(2.0)
     speaking = false
@@ -1116,6 +1184,7 @@ local synonyms = {
     satellites  = {"sats", "links"},
     help        = {"commands", "list", "menu"},
     shutdown    = {"offline", "bye"},
+    config      = {"setup", "assignments", "monitors"},
 }
 
 -- Reverse lookup: synonym → canonical command
@@ -1176,23 +1245,28 @@ local function chatLoop()
             local ok,s,m,u = pcall(function()
                 return bridge.getEnergyStorage(), bridge.getMaxEnergyStorage(), bridge.getEnergyUsage()
             end)
-            if ok then say(string.format("AE2 energy: %d%% (%s / %s AE). Usage: %s AE/t.",
-                math.floor((s/m)*100), fmtNum(s), fmtNum(m), fmtNum(u)))
+            if ok and s and m and m > 0 then
+                say(string.format("AE2 energy: %d%% (%s / %s AE). Usage: %s AE/t.",
+                    math.floor((s/m)*100), fmtNum(s), fmtNum(m), fmtNum(u or 0)))
             else say("ME Bridge offline. Cannot retrieve energy data.") end
 
         elseif cmd == "storage" then
             local ok,used,total,avail = pcall(function()
                 return bridge.getUsedItemStorage(), bridge.getTotalItemStorage(), bridge.getAvailableItemStorage()
             end)
-            if ok then say(string.format("AE2 storage: %d%% full. %s used, %s free of %s total slots.",
-                math.floor((used/total)*100), fmtNum(used), fmtNum(avail), fmtNum(total)))
+            if ok and used and total and total > 0 then
+                avail = avail or (total - used)
+                say(string.format("AE2 storage: %d%% full. %s used, %s free of %s total slots.",
+                    math.floor((used/total)*100), fmtNum(used), fmtNum(avail), fmtNum(total)))
             else say("ME Bridge offline. Cannot retrieve storage data.") end
 
         elseif cmd == "items" then
             local ok, count = pcall(function()
-                local n=0 ; for _ in pairs(bridge.listItems()) do n=n+1 end ; return n
+                local list = bridge.listItems()
+                if not list then return nil end
+                local n=0 ; for _ in pairs(list) do n=n+1 end ; return n
             end)
-            if ok then say("The AE2 network holds "..fmtNum(count).." distinct item types.")
+            if ok and count then say("The AE2 network holds "..fmtNum(count).." distinct item types.")
             else say("ME Bridge offline. Cannot retrieve item data.") end
 
         elseif cmd == "find" then
@@ -1200,30 +1274,34 @@ local function chatLoop()
             if not query then say("Specify an item. Usage: Jarvis find <item>")
             else
                 local ok, result = pcall(function()
+                    local list = bridge.listItems()
+                    if not list then return nil end
                     local matches = {}
-                    for _, item in ipairs(bridge.listItems()) do
-                        if item.name:lower():find(query, 1, true) then
-                            table.insert(matches, item.name.." x"..fmtNum(item.count))
+                    for _, item in ipairs(list) do
+                        if item.name and item.name:lower():find(query, 1, true) then
+                            table.insert(matches, item.name.." x"..fmtNum(item.count or 0))
                             if #matches >= 3 then break end
                         end
                     end
                     return matches
                 end)
-                if ok and #result>0 then say("Found: "..table.concat(result,", ")..".")
-                elseif ok            then say("No items matching '"..query.."' found.")
-                else                      say("ME Bridge offline. Cannot search items.") end
+                if ok and result and #result>0 then say("Found: "..table.concat(result,", ")..".")
+                elseif ok and result            then say("No items matching '"..query.."' found.")
+                else                                 say("ME Bridge offline. Cannot search items.") end
             end
 
         elseif cmd == "network" then
             local ok, info = pcall(function()
                 local s=bridge.getEnergyStorage() ; local m=bridge.getMaxEnergyStorage()
                 local us=bridge.getUsedItemStorage() ; local ts=bridge.getTotalItemStorage()
+                if not (s and m and us and ts) or m == 0 or ts == 0 then return nil end
                 return string.format("Energy %d%%, Storage %d%% used.",
                     math.floor((s/m)*100), math.floor((us/ts)*100))
             end)
-            if ok then say("Network status: "..info) else say("ME Bridge offline.") end
+            if ok and info then say("Network status: "..info)
+            else say("ME Bridge offline.") end
 
-        elseif cmd == "lite" or cmd == "light" then
+        elseif cmd == "lite" then
             local sub = words[3] and words[3]:lower() or nil
             if     sub == "on"  then sendToSatellite("campfire", "on")     ; say("Campfire ignited.")
             elseif sub == "off" then sendToSatellite("campfire", "off")    ; say("Campfire doused.")
@@ -1270,6 +1348,16 @@ local function chatLoop()
             else say("No speaker connected.") end
 
         elseif cmd == "help"     then say("Commands are displayed on the help monitor.")
+        elseif cmd == "config" then
+            local parts = {}
+            for _, r in ipairs({"helpMon","faceMon","energyMon","lightsMon","stoMon","lastMon","clockMon"}) do
+                if monNames[r] then
+                    local label = r:gsub("Mon$", "")
+                    table.insert(parts, label.."="..monNames[r])
+                end
+            end
+            if #parts > 0 then say("Monitors: "..table.concat(parts, ", ")..".")
+            else say("No monitors assigned. Check terminal for details.") end
         elseif cmd == "altname" then
             local target = words[3] and words[3]:lower() or nil
             if not target then
@@ -1327,7 +1415,7 @@ end
 
 math.randomseed(os.time())
 playMelody("startup")
-box.sendMessage("J.A.R.V.I.S online. All systems nominal.", "Jarvis")
+if box then pcall(function() box.sendMessage("J.A.R.V.I.S online. All systems nominal.", "Jarvis") end) end
 pingSatellites()  -- discover any satellites already running
 
 parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop, satelliteLoop)
