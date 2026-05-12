@@ -85,8 +85,45 @@ local function autogenMainConfig()
                  .. "meBridge: auto\n"
                  .. "speaker:  auto\n"
 
+    -- Detect redstone integrators in network order so we can pre-fill.
+    local ris = {}
+    for _, name in ipairs(peripheral.getNames()) do
+        if peripheral.getType(name) == "redstoneIntegrator" then
+            table.insert(ris, name)
+        end
+    end
+    -- Scroller is a separate peripheral (CC:Create Bridge "scroller pane",
+    -- or any peripheral whose type contains "scroll").
+    local scrollerCandidate = nil
+    for _, name in ipairs(peripheral.getNames()) do
+        local t = peripheral.getType(name) or ""
+        if t:lower():find("scroll", 1, true) then
+            scrollerCandidate = name
+            break
+        end
+    end
+    local rsLight  = ris[1] or "auto"
+    local rsTalk   = ris[2] or "auto"
+    local rsScroll = scrollerCandidate or "auto"
+
+    content = content
+        .. "\n"
+        .. "-- Redstone --\n"
+        .. "# light  : redstone integrator that drives the lights (ON/OFF output).\n"
+        .. "# talk   : redstone integrator pulsed HIGH while JARVIS speaks.\n"
+        .. "light:   "..rsLight.."\n"
+        .. "talk:    "..rsTalk.."\n"
+        .. "\n"
+        .. "-- Inputs --\n"
+        .. "# scroll : the scroller pane peripheral (CC:Create Bridge), or any\n"
+        .. "#          peripheral that exposes a 0-15 value. JARVIS uses it to\n"
+        .. "#          pick which help page is shown (0 = command list).\n"
+        .. "#          If your scroller emits a wider range (0-100, 0-255),\n"
+        .. "#          values are clamped to 0-15.\n"
+        .. "scroll:  "..rsScroll.."\n"
+
     cfgio.writeFile("config.txt", content)
-    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) detected.")
+    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) and "..#ris.." integrator(s) detected.")
 end
 
 if not fs.exists("config.txt") then
@@ -115,6 +152,14 @@ local speakerName  = find("speaker")
 local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or peripheral.find("chatBox")
 local bridge = meBridgeName and peripheral.wrap(meBridgeName) or peripheral.find("meBridge")
 local spk    = speakerName  and peripheral.wrap(speakerName)  or peripheral.find("speaker")
+
+-- Redstone integrators (each role is its own integrator).
+local lightsRIName   = find("light")    -- lights on/off
+local talkRIName     = find("talk")     -- ON while speaking
+local scrollerRIName = find("scroll")   -- analog 0-15 input picks help page
+local lightsRI       = lightsRIName   and peripheral.wrap(lightsRIName)
+local talkRI         = talkRIName     and peripheral.wrap(talkRIName)
+local scrollerRI     = scrollerRIName and peripheral.wrap(scrollerRIName)
 
 -- ─── Config diagnostics ──────────────────────────────
 -- Print what the config file actually contains so the user can verify
@@ -149,6 +194,9 @@ verifyName("lights",   CFG_LIGHTS)
 verifyName("chatBox",  chatBoxName)
 verifyName("meBridge", meBridgeName)
 verifyName("speaker",  speakerName)
+verifyName("light",    lightsRIName)
+verifyName("talk",     talkRIName)
+verifyName("scroll",   scrollerRIName)
 
 -- ═══════════════════════════════════════════════════════
 --  SATELLITE COMMS
@@ -607,10 +655,9 @@ end
 
 local function setAllLights(state)
     lightsState = state
-    for _, name in ipairs(peripheral.getNames()) do
-        if peripheral.getType(name) == "redstoneIntegrator" then
-            local ri = peripheral.wrap(name)
-            for _, side in ipairs(allSides) do ri.setOutput(side, state) end
+    if lightsRI then
+        for _, side in ipairs(allSides) do
+            pcall(function() lightsRI.setOutput(side, state) end)
         end
     end
     drawLightsStatus()
@@ -695,6 +742,8 @@ local helpSections = {
     { name = "SYSTEM", col = colors.red, cmds = {
         {"help",            "show commands"},
         {"config",          "show monitor map"},
+        {"page <n>",        "force help page"},
+        {"pdebug <name>",   "inspect peripheral"},
         {"altname <cmd>",   "show synonyms"},
         {"shutdown",        "go offline"},
     }},
@@ -727,6 +776,45 @@ local function drawHelp()
             y = y + 1
         end
         y = y + 1
+    end
+    -- Scroll hint at the bottom (only if a scroller integrator is connected)
+    if scrollerRI and h >= 4 then
+        mon.setTextColor(colors.gray)
+        mon.setBackgroundColor(colors.black)
+        mon.setCursorPos(1, h)
+        local hint = "scroll: 0/15"
+        local x = math.max(1, math.floor((w - #hint) / 2) + 1)
+        mon.setCursorPos(x, h)
+        mon.write(hint)
+    end
+end
+
+-- Multi-page help.  Page 0 is the live command list.  Pages 1-15 are
+-- TBD placeholders driven by the scroller integrator's analog input.
+local currentHelpPage = 0
+local function drawHelpPage(n)
+    n = math.max(0, math.min(15, math.floor(n or 0)))
+    currentHelpPage = n
+    if n == 0 then drawHelp() ; return end
+    local mon = helpMon
+    if not mon then return end
+    local w, h = mon.getSize()
+    mon.setBackgroundColor(colors.black)
+    mon.clear()
+    centerWrite(mon, 1, "[ PAGE "..n.." / 15 ]", colors.cyan, colors.black)
+    divider(mon, 2)
+    local mid = math.max(4, math.floor(h / 2))
+    centerWrite(mon, mid - 1, "[ TBD ]",          colors.yellow,    colors.black)
+    centerWrite(mon, mid + 1, "Suggest content",  colors.lightGray, colors.black)
+    centerWrite(mon, mid + 2, "in the Discord",   colors.lightGray, colors.black)
+    centerWrite(mon, mid + 3, "JARVIS thread!",   colors.lightGray, colors.black)
+    if h >= 6 then
+        mon.setTextColor(colors.gray)
+        mon.setBackgroundColor(colors.black)
+        local hint = "scroll: "..n.."/15"
+        local x = math.max(1, math.floor((w - #hint) / 2) + 1)
+        mon.setCursorPos(x, h)
+        mon.write(hint)
     end
 end
 
@@ -1110,12 +1198,21 @@ local function drawHUD() drawFace() end
 --  say()
 -- ─────────────────────────────────────────────
 
+local function setTalkOutput(state)
+    if not talkRI then return end
+    for _, side in ipairs(allSides) do
+        pcall(function() talkRI.setOutput(side, state) end)
+    end
+end
+
 local function say(msg)
     lastResponse = msg
     speaking = true
+    setTalkOutput(true)
     if box then pcall(function() box.sendMessage(msg, "Jarvis") end) end
     drawLastResponse()
     sleep(2.0)
+    setTalkOutput(false)
     speaking = false
 end
 
@@ -1142,7 +1239,7 @@ end
 --  Initial draws
 -- ─────────────────────────────────────────────
 
-drawHelp() ; drawLightsStatus() ; drawLastResponse()
+drawHelpPage(0) ; drawLightsStatus() ; drawLastResponse()
 drawClock() ; drawEnergy() ; drawStorage() ; drawHUD()
 
 -- ─────────────────────────────────────────────
@@ -1185,6 +1282,8 @@ local synonyms = {
     help        = {"commands", "list", "menu"},
     shutdown    = {"offline", "bye"},
     config      = {"setup", "assignments", "monitors"},
+    page        = {"scroll", "screen"},
+    pdebug      = {"inspect", "methods"},
 }
 
 -- Reverse lookup: synonym → canonical command
@@ -1348,6 +1447,24 @@ local function chatLoop()
             else say("No speaker connected.") end
 
         elseif cmd == "help"     then say("Commands are displayed on the help monitor.")
+        elseif cmd == "pdebug" then
+            local pname = words[3]
+            if not pname then say("Usage: jarvis pdebug <peripheralName>")
+            else
+                local t = peripheral.getType(pname)
+                if not t then say("'"..pname.."' is not a connected peripheral.")
+                else
+                    local methods = peripheral.getMethods(pname) or {}
+                    print("[JARVIS] "..pname.." (type: "..t.."):")
+                    for _, m in ipairs(methods) do print("  "..m) end
+                    say(pname.." is a '"..t.."' with "..#methods.." methods (see terminal).")
+                end
+            end
+        elseif cmd == "page" then
+            local n = tonumber(words[3])
+            if not n then say("Usage: jarvis page <0-15>. Forces a help page.")
+            else drawHelpPage(n) ; say("Help page set to "..math.max(0, math.min(15, math.floor(n)))..".")
+            end
         elseif cmd == "config" then
             local parts = {}
             for _, r in ipairs({"helpMon","faceMon","energyMon","lightsMon","stoMon","lastMon","clockMon"}) do
@@ -1394,6 +1511,53 @@ local function storageLoop() while running do drawStorage() ; sleep(5)   end end
 local function clockLoop()   while running do drawClock()   ; sleep(1)   end end
 local function energyLoop()  while running do drawEnergy()  ; sleep(5)   end end
 
+-- Reads a "value" from whatever peripheral is wired as the scroller.
+-- Duck-typed: tries redstone integrator's getAnalogInput first, then
+-- common CC:Create Bridge method names. Returns 0 if nothing works.
+local function readScrollerValue()
+    if not scrollerRI then return 0 end
+    -- 1) Redstone integrator: max analog signal across all sides.
+    if scrollerRI.getAnalogInput then
+        local maxVal = 0
+        for _, side in ipairs(allSides) do
+            local ok, v = pcall(scrollerRI.getAnalogInput, side)
+            if ok and type(v) == "number" and v > maxVal then maxVal = v end
+        end
+        if maxVal > 0 then return maxVal end
+    end
+    -- 2) Common method names on Create/CC:C Bridge peripherals.
+    local candidates = {
+        "getValue", "getScrollValue", "getScroll",
+        "getInput", "getInputCount",
+        "getOutput", "getOutputCount", "getOutputSignal",
+        "getSignal", "getCount",
+    }
+    for _, m in ipairs(candidates) do
+        if scrollerRI[m] then
+            local ok, v = pcall(scrollerRI[m], scrollerRI)
+            if ok and type(v) == "number" then return v end
+        end
+    end
+    return 0
+end
+
+-- Polls the scroller and redraws the help monitor when the value changes.
+-- Prints each new value so you can see your peripheral's actual range.
+local function scrollerLoop()
+    local lastVal = -1
+    while running do
+        if scrollerRI then
+            local val = readScrollerValue()
+            if val ~= lastVal then
+                lastVal = val
+                print(string.format("[JARVIS] scroller value: %s", tostring(val)))
+                drawHelpPage(val)
+            end
+        end
+        sleep(0.5)
+    end
+end
+
 -- Listens for satellite hellos / pongs and tracks them by role.
 local function satelliteLoop()
     while running do
@@ -1418,4 +1582,4 @@ playMelody("startup")
 if box then pcall(function() box.sendMessage("J.A.R.V.I.S online. All systems nominal.", "Jarvis") end) end
 pingSatellites()  -- discover any satellites already running
 
-parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop, satelliteLoop)
+parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop, satelliteLoop, scrollerLoop)
