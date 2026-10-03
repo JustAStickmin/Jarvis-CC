@@ -918,7 +918,7 @@ local function drawEnergy()
     mon.clear()
 
     local ok, stored, maxE, usage = pcall(function()
-        return bridge.getEnergyStorage(), bridge.getMaxEnergyStorage(), bridge.getEnergyUsage()
+        return bridge.getStoredEnergy(), bridge.getEnergyCapacity(), bridge.getEnergyUsage()
     end)
     if not ok or not stored or not maxE or maxE == 0 then
         centerWrite(mon, math.floor(h/2), "Bridge", colors.red, colors.black)
@@ -1372,7 +1372,7 @@ local function chatLoop()
 
         elseif cmd == "energy" then
             local ok,s,m,u = pcall(function()
-                return bridge.getEnergyStorage(), bridge.getMaxEnergyStorage(), bridge.getEnergyUsage()
+                return bridge.getStoredEnergy(), bridge.getEnergyCapacity(), bridge.getEnergyUsage()
             end)
             if ok and s and m and m > 0 then
                 say(string.format("AE2 energy: %d%% (%s / %s AE). Usage: %s AE/t.",
@@ -1391,7 +1391,7 @@ local function chatLoop()
 
         elseif cmd == "items" then
             local ok, count = pcall(function()
-                local list = bridge.listItems()
+                local list = bridge.getItems()
                 if not list then return nil end
                 local n=0 ; for _ in pairs(list) do n=n+1 end ; return n
             end)
@@ -1403,12 +1403,12 @@ local function chatLoop()
             if not query then say("Specify an item. Usage: Jarvis find <item>")
             else
                 local ok, result = pcall(function()
-                    local list = bridge.listItems()
+                    local list = bridge.getItems()
                     if not list then return nil end
                     local matches = {}
                     for _, item in ipairs(list) do
                         if item.name and item.name:lower():find(query, 1, true) then
-                            table.insert(matches, item.name.." x"..fmtNum(item.amount or 0))
+                            table.insert(matches, item.name.." x"..fmtNum(item.count or 0))
                             if #matches >= 3 then break end
                         end
                     end
@@ -1421,7 +1421,7 @@ local function chatLoop()
 
         elseif cmd == "network" then
             local ok, info = pcall(function()
-                local s=bridge.getEnergyStorage() ; local m=bridge.getMaxEnergyStorage()
+                local s=bridge.getStoredEnergy() ; local m=bridge.getEnergyCapacity()
                 local us=bridge.getUsedItemStorage() ; local ts=bridge.getTotalItemStorage()
                 if not (s and m and us and ts) or m == 0 or ts == 0 then return nil end
                 return string.format("Energy %d%%, Storage %d%% used.",
