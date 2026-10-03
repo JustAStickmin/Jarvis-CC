@@ -88,7 +88,7 @@ local function autogenMainConfig()
     -- Detect redstone integrators in network order so we can pre-fill.
     local ris = {}
     for _, name in ipairs(peripheral.getNames()) do
-        if peripheral.getType(name) == "redstoneIntegrator" then
+        if peripheral.getType(name) == "redstone_relay" then
             table.insert(ris, name)
         end
     end
@@ -148,8 +148,8 @@ local CFG_LIGHTS  = find("lights")   -- 1x1 lights status           (even squari
 local chatBoxName  = find("chatBox")
 local meBridgeName = find("meBridge")
 local speakerName  = find("speaker")
-local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or peripheral.find("chatBox")
-local bridge = meBridgeName and peripheral.wrap(meBridgeName) or peripheral.find("meBridge")
+local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or peripheral.find("chat_box")
+local bridge = meBridgeName and peripheral.wrap(meBridgeName) or peripheral.find("me_bridge")
 local spk    = speakerName  and peripheral.wrap(speakerName)  or peripheral.find("speaker")
 
 -- Redstone integrators (each role is its own integrator).
@@ -1408,7 +1408,7 @@ local function chatLoop()
                     local matches = {}
                     for _, item in ipairs(list) do
                         if item.name and item.name:lower():find(query, 1, true) then
-                            table.insert(matches, item.name.." x"..fmtNum(item.count or 0))
+                            table.insert(matches, item.name.." x"..fmtNum(item.amount or 0))
                             if #matches >= 3 then break end
                         end
                     end
