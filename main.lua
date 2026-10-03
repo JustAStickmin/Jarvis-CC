@@ -1,5 +1,5 @@
 -- JARVIS - CC: Tweaked AI Assistant
--- Peripherals: chatBox, meBridge, redstoneIntegrator x N, speaker, 7 monitors
+-- Peripherals: chatBox, meBridge, redstoneRelay x N, speaker, 7 monitors
 
 -- ═══════════════════════════════════════════════════════
 --  CONFIG
@@ -85,10 +85,11 @@ local function autogenMainConfig()
                  .. "meBridge: auto\n"
                  .. "speaker:  auto\n"
 
-    -- Detect redstone integrators in network order so we can pre-fill.
+    -- Detect redstone relays in network order so we can pre-fill.
     local ris = {}
     for _, name in ipairs(peripheral.getNames()) do
-        if peripheral.getType(name) == "redstone_relay" then
+        local t = peripheral.getType(name)
+        if t == "redstone_relay" or t == "redstoneIntegrator" then
             table.insert(ris, name)
         end
     end
@@ -109,8 +110,8 @@ local function autogenMainConfig()
     content = content
         .. "\n"
         .. "-- Redstone --\n"
-        .. "# light  : redstone integrator that drives the lights (ON/OFF output).\n"
-        .. "# talk   : redstone integrator pulsed HIGH while JARVIS speaks.\n"
+        .. "# light  : redstone relay that drives the lights (ON/OFF output).\n"
+        .. "# talk   : redstone relay pulsed HIGH while JARVIS speaks.\n"
         .. "light:   "..rsLight.."\n"
         .. "talk:    "..rsTalk.."\n"
         .. "\n"
@@ -122,7 +123,7 @@ local function autogenMainConfig()
         .. "scroll:  "..rsScroll.."\n"
 
     cfgio.writeFile("config.txt", content)
-    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) and "..#ris.." integrator(s) detected.")
+    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) and "..#ris.." relay(s) detected.")
 end
 
 if not fs.exists("config.txt") then
@@ -148,11 +149,32 @@ local CFG_LIGHTS  = find("lights")   -- 1x1 lights status           (even squari
 local chatBoxName  = find("chatBox")
 local meBridgeName = find("meBridge")
 local speakerName  = find("speaker")
-local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or peripheral.find("chat_box")
-local bridge = meBridgeName and peripheral.wrap(meBridgeName) or peripheral.find("me_bridge")
+local function findAny(...)
+    for _, t in ipairs({...}) do
+        local p = peripheral.find(t)
+        if p then return p end
+    end
+end
+local box    = chatBoxName  and peripheral.wrap(chatBoxName)  or findAny("chat_box", "chatBox")
+local bridge = meBridgeName and peripheral.wrap(meBridgeName) or findAny("me_bridge", "meBridge")
 local spk    = speakerName  and peripheral.wrap(speakerName)  or peripheral.find("speaker")
+local apChat08 = box ~= nil and box.narrateMessage ~= nil
 
--- Redstone integrators (each role is its own integrator).
+local function bridgeCall(...)
+    local names = {...}
+    for _, m in ipairs(names) do
+        if bridge[m] then return bridge[m]() end
+    end
+    error("ME Bridge has no "..names[1])
+end
+
+local function chatSend(msg)
+    if not box then return end
+    if apChat08 then pcall(box.sendMessage, msg, { prefix = "Jarvis" })
+    else             pcall(box.sendMessage, msg, "Jarvis") end
+end
+
+-- Redstone relays (each role is its own relay).
 local lightsRIName   = find("light")    -- lights on/off
 local talkRIName     = find("talk")     -- ON while speaking
 local scrollerRIName = find("scroll")   -- 0-15 input picks help page
@@ -824,7 +846,7 @@ local function drawHelp()
 end
 
 -- Multi-page help.  Page 0 is the live command list.  Pages 1-15 are
--- TBD placeholders driven by the scroller integrator's analog input.
+-- TBD placeholders driven by the scroller relay's analog input.
 local currentHelpPage = 0
 local function drawHelpPage(n)
     n = math.max(0, math.min(15, math.floor(n or 0)))
@@ -918,7 +940,7 @@ local function drawEnergy()
     mon.clear()
 
     local ok, stored, maxE, usage = pcall(function()
-        return bridge.getStoredEnergy(), bridge.getEnergyCapacity(), bridge.getEnergyUsage()
+        return bridgeCall("getStoredEnergy", "getEnergyStorage"), bridgeCall("getEnergyCapacity", "getMaxEnergyStorage"), bridge.getEnergyUsage()
     end)
     if not ok or not stored or not maxE or maxE == 0 then
         centerWrite(mon, math.floor(h/2), "Bridge", colors.red, colors.black)
@@ -997,7 +1019,7 @@ local function drawStorage()
     divider(mon, 2)
 
     local ok, used, total, avail = pcall(function()
-        return bridge.getUsedItemStorage(), bridge.getTotalItemStorage(), bridge.getAvailableItemStorage()
+        return bridge.getUsedItemStorage(), bridgeCall("getTotalItemStorage", "getMaxItemStorage"), bridge.getAvailableItemStorage()
     end)
     if not ok or not used or not total or total == 0 then
         centerWrite(mon, 3, "Bridge",   colors.red, colors.black)
@@ -1236,7 +1258,7 @@ local function say(msg)
     lastResponse = msg
     speaking = true
     setTalkOutput(true)
-    if box then pcall(function() box.sendMessage(msg, "Jarvis") end) end
+    chatSend(msg)
     drawLastResponse()
     sleep(2.0)
     setTalkOutput(false)
@@ -1329,7 +1351,9 @@ local running = true
 
 local function chatLoop()
     while running do
-        local _, user, rawMsg = os.pullEvent("chat")
+        local _, a, b, c = os.pullEvent("chat")
+        local user, rawMsg = a, b
+        if apChat08 then user, rawMsg = b, c end
         local msg   = rawMsg:lower():gsub("^%s+",""):gsub("%s+$","")
         local words = {}
         for w in msg:gmatch("%S+") do table.insert(words, w) end
@@ -1372,7 +1396,7 @@ local function chatLoop()
 
         elseif cmd == "energy" then
             local ok,s,m,u = pcall(function()
-                return bridge.getStoredEnergy(), bridge.getEnergyCapacity(), bridge.getEnergyUsage()
+                return bridgeCall("getStoredEnergy", "getEnergyStorage"), bridgeCall("getEnergyCapacity", "getMaxEnergyStorage"), bridge.getEnergyUsage()
             end)
             if ok and s and m and m > 0 then
                 say(string.format("AE2 energy: %d%% (%s / %s AE). Usage: %s AE/t.",
@@ -1381,7 +1405,7 @@ local function chatLoop()
 
         elseif cmd == "storage" then
             local ok,used,total,avail = pcall(function()
-                return bridge.getUsedItemStorage(), bridge.getTotalItemStorage(), bridge.getAvailableItemStorage()
+                return bridge.getUsedItemStorage(), bridgeCall("getTotalItemStorage", "getMaxItemStorage"), bridge.getAvailableItemStorage()
             end)
             if ok and used and total and total > 0 then
                 avail = avail or (total - used)
@@ -1391,7 +1415,7 @@ local function chatLoop()
 
         elseif cmd == "items" then
             local ok, count = pcall(function()
-                local list = bridge.getItems()
+                local list = bridgeCall("getItems", "listItems")
                 if not list then return nil end
                 local n=0 ; for _ in pairs(list) do n=n+1 end ; return n
             end)
@@ -1403,12 +1427,12 @@ local function chatLoop()
             if not query then say("Specify an item. Usage: Jarvis find <item>")
             else
                 local ok, result = pcall(function()
-                    local list = bridge.getItems()
+                    local list = bridgeCall("getItems", "listItems")
                     if not list then return nil end
                     local matches = {}
                     for _, item in ipairs(list) do
                         if item.name and item.name:lower():find(query, 1, true) then
-                            table.insert(matches, item.name.." x"..fmtNum(item.count or 0))
+                            table.insert(matches, item.name.." x"..fmtNum(item.count or item.amount or 0))
                             if #matches >= 3 then break end
                         end
                     end
@@ -1421,8 +1445,8 @@ local function chatLoop()
 
         elseif cmd == "network" then
             local ok, info = pcall(function()
-                local s=bridge.getStoredEnergy() ; local m=bridge.getEnergyCapacity()
-                local us=bridge.getUsedItemStorage() ; local ts=bridge.getTotalItemStorage()
+                local s=bridgeCall("getStoredEnergy", "getEnergyStorage") ; local m=bridgeCall("getEnergyCapacity", "getMaxEnergyStorage")
+                local us=bridge.getUsedItemStorage() ; local ts=bridgeCall("getTotalItemStorage", "getMaxItemStorage")
                 if not (s and m and us and ts) or m == 0 or ts == 0 then return nil end
                 return string.format("Energy %d%%, Storage %d%% used.",
                     math.floor((s/m)*100), math.floor((us/ts)*100))
@@ -1542,11 +1566,11 @@ local function clockLoop()   while running do drawClock()   ; sleep(1)   end end
 local function energyLoop()  while running do drawEnergy()  ; sleep(5)   end end
 
 -- Reads a "value" from whatever peripheral is wired as the scroller.
--- Duck-typed: tries redstone integrator's getAnalogInput first, then
+-- Duck-typed: tries redstone relay's getAnalogInput first, then
 -- common CC:Create Bridge method names. Returns 0 if nothing works.
 local function readScrollerValue()
     if not scrollerRI then return 0 end
-    -- 1) Redstone integrator: max analog signal across all sides.
+    -- 1) Redstone relay: max analog signal across all sides.
     if scrollerRI.getAnalogInput then
         local maxVal = 0
         for _, side in ipairs(allSides) do
@@ -1611,7 +1635,7 @@ end
 
 math.randomseed(os.time())
 playMelody("startup")
-if box then pcall(function() box.sendMessage("J.A.R.V.I.S online. All systems nominal.", "Jarvis") end) end
+chatSend("J.A.R.V.I.S online. All systems nominal.")
 pingSatellites()  -- discover any satellites already running
 
 parallel.waitForAny(chatLoop, hudLoop, storageLoop, clockLoop, energyLoop, satelliteLoop, scrollerLoop)
