@@ -88,15 +88,17 @@ function M.writeFile(path, content)
 end
 
 -- Compute a monitor's block size (in physical Minecraft blocks).
--- CC: Tweaked at scale=1, charW = blockW*8 - 1, charH = blockH*6 - 1
--- (so a 4x4 block monitor has 31x23 chars at scale 1).
+function M.blocksFromChars(cw, ch)
+    local bw = math.floor(cw * 6 / 64 + 0.3125 + 0.5)
+    local bh = math.floor(ch * 9 / 64 + 0.3125 + 0.5)
+    return bw, bh
+end
+
 function M.blockSize(monitor)
     monitor.setTextScale(1)
     local cw, ch = monitor.getSize()
     if cw == 0 or ch == 0 then return 0, 0 end
-    local bw = math.floor((cw + 1) / 8 + 0.5)
-    local bh = math.floor((ch + 1) / 6 + 0.5)
-    return bw, bh
+    return M.blocksFromChars(cw, ch)
 end
 
 -- Detect all monitors on the network. Returns a list of
@@ -116,12 +118,38 @@ function M.detectMonitors()
         if peripheral.getType(name) == "monitor" then
             local m = peripheral.wrap(name)
             local cw, ch = m.getSize()
-            local bw = math.floor((cw + 1) / 8 + 0.5)
-            local bh = math.floor((ch + 1) / 6 + 0.5)
+            local bw, bh = M.blocksFromChars(cw, ch)
             table.insert(mons, {name = name, cw = cw, ch = ch, bw = bw, bh = bh})
         end
     end
     return mons
+end
+
+function M.assignMonitors(mons, roles)
+    local pool = {}
+    for _, m in ipairs(mons) do table.insert(pool, m) end
+    local out = {}
+    local function pick(role, score)
+        local bestI, bestS
+        for i, m in ipairs(pool) do
+            local s = score(m)
+            if s and (not bestS or s < bestS) then bestI, bestS = i, s end
+        end
+        if bestI then out[role] = table.remove(pool, bestI) end
+    end
+    for _, r in ipairs(roles) do
+        pick(r[1], function(m)
+            if m.bw == r[2] and m.bh == r[3] then return 0 end
+        end)
+    end
+    for _, r in ipairs(roles) do
+        if not out[r[1]] then
+            pick(r[1], function(m)
+                return math.abs(m.bw - r[2]) + math.abs(m.bh - r[3])
+            end)
+        end
+    end
+    return out
 end
 
 return M

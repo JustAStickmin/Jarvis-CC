@@ -10,49 +10,22 @@
 -- ═══════════════════════════════════════════════════════
 local cfgio = dofile("cfgio.lua")
 
+local MON_ROLES = {
+    {"help", 5, 4}, {"face", 5, 4}, {"energy", 3, 2}, {"lights", 1, 1},
+    {"storage", 1, 4}, {"last", 4, 1}, {"clock", 4, 1},
+}
+
 local function autogenMainConfig()
     print("[JARVIS] No config.txt — detecting monitors to generate one...")
     local mons = cfgio.detectMonitors()
-    local portrait, veryWide, squarish = {}, {}, {}
-    for _, r in ipairs(mons) do
-        if     r.ch >= r.cw * 1.5 then table.insert(portrait, r)
-        elseif r.cw >= r.ch * 2   then table.insert(veryWide, r)
-        else                           table.insert(squarish, r)
-        end
-    end
-    -- Sub-bucket squarish by orientation so 5x4 (wider, face/help) and
-    -- 4x5 (taller) don't fight over the same slot.
-    local tallSq, wideSq, evenSq = {}, {}, {}
-    for _, r in ipairs(squarish) do
-        if     r.ch > r.cw then table.insert(tallSq, r)
-        elseif r.cw > r.ch then table.insert(wideSq, r)
-        else                    table.insert(evenSq, r)
-        end
-    end
-    local function byAreaDesc(a, b) return a.cw*a.ch > b.cw*b.ch end
-    local function byAreaAsc(a, b)  return a.cw*a.ch < b.cw*b.ch end
-    table.sort(portrait, byAreaDesc)
-    table.sort(veryWide, byAreaDesc)
-    table.sort(tallSq,   byAreaDesc)
-    table.sort(wideSq,   byAreaDesc)
-    table.sort(evenSq,   byAreaDesc)
-
-    local function take(t) return table.remove(t, 1) end
-
-    -- help & face want wider squarish (5x4). Take the two largest.
-    local helpMon = take(wideSq) or take(tallSq) or take(evenSq)
-    local faceMon = take(wideSq) or take(tallSq) or take(evenSq)
-    -- energy wants smallest wider squarish (3x2). Re-sort ascending.
-    table.sort(wideSq, byAreaAsc)
-    local energyMon = take(wideSq) or take(evenSq) or take(tallSq)
-    -- lights wants smallest even squarish (1x1).
-    table.sort(evenSq, byAreaAsc)
-    local lightsMon = take(evenSq) or take(wideSq) or take(tallSq)
-    -- storage = portrait. clock & last = very wide (both 4x1, same shape —
-    -- autogen guesses, user swaps in config.txt if needed).
-    local storageMon = take(portrait)
-    local clockMon   = take(veryWide)
-    local lastMon    = take(veryWide) or take(portrait)
+    local picked = cfgio.assignMonitors(mons, MON_ROLES)
+    local helpMon    = picked.help
+    local faceMon    = picked.face
+    local energyMon  = picked.energy
+    local lightsMon  = picked.lights
+    local storageMon = picked.storage
+    local lastMon    = picked.last
+    local clockMon   = picked.clock
 
     local function fmt(role, detected, defaultSize)
         local name = detected and detected.name or "monitor_x"
@@ -463,96 +436,58 @@ end
 -- ─────────────────────────────────────────────
 --  Monitor detection
 -- ─────────────────────────────────────────────
---
---  Step 1: Set ALL monitors to scale 1, then sleep 0.5 s so
---          the scale change propagates before we call getSize().
---          (Without the sleep, getSize may return stale values.)
---
---  Step 2: Bucket by character shape:
---    portrait  h >= w*1.5  →  stoMon (larger), lastMon (smaller)
---    veryWide  w >= h*2    →  clockMon
---    squarish  everything else, sorted by area:
---              helpMon > faceMon > energyMon > lightsMon
---
---  Step 3: If CFG_* overrides are set, use those instead.
---
---  Expected block sizes → character shape at any scale:
---    helpMon   4×5  squarish  (chars ~28×25, slightly wide)
---    faceMon   4×4  squarish  (chars ~28×20)
---    stoMon    2×6  portrait  (chars ~14×30)
---    energyMon 3×3  squarish  (chars ~21×15)
---    lastMon   1×3  portrait  (chars  ~7×15)
---    clockMon  2×1  veryWide  (chars ~14×5)
---    lightsMon 1×1  squarish  (chars   ~7×5)
--- ─────────────────────────────────────────────
 
 local function detectMonitors()
-    -- Pass 1: set scale on every monitor
-    local names = {}
-    for _, name in ipairs(peripheral.getNames()) do
-        if peripheral.getType(name) == "monitor" then
-            peripheral.wrap(name).setTextScale(1)
-            table.insert(names, name)
-        end
+    local found = cfgio.detectMonitors()
+    print(string.format("[JARVIS] %d monitor(s) found:", #found))
+    for _, r in ipairs(found) do
+        print(string.format("  %-12s  %dx%d blocks  (%dx%d chars)", r.name, r.bw, r.bh, r.cw, r.ch))
     end
 
-    -- Wait for scale to take effect
-    sleep(0.5)
-
-    -- Pass 2: read sizes
-    local raw = {}
-    print(string.format("[JARVIS] %d monitor(s) found:", #names))
-    for _, name in ipairs(names) do
-        local m = peripheral.wrap(name)
-        local w, h = m.getSize()
-        local area = w * h
-        print(string.format("  %-12s  w=%-3d h=%-3d  area=%-5d  %s",
-            name, w, h, area,
-            h >= w * 1.5 and "PORTRAIT" or w >= h * 2 and "VERYWIDE" or "squarish"))
-        table.insert(raw, {mon=m, w=w, h=h, area=area, name=name})
-    end
-
-    -- Bucket by shape
-    local portrait, veryWide, squarish = {}, {}, {}
-    for _, r in ipairs(raw) do
-        if     r.h >= r.w * 1.5 then table.insert(portrait, r)
-        elseif r.w >= r.h * 2   then table.insert(veryWide, r)
-        else                          table.insert(squarish, r)
-        end
-    end
-
-    table.sort(portrait,  function(a,b) return a.area > b.area end)
-    table.sort(veryWide,  function(a,b) return a.area > b.area end)
-    table.sort(squarish,  function(a,b) return a.area > b.area end)
-
-    -- Each resolve returns (monitor, name, source) so we can print clearly.
-    local function resolve(cfg, bucket, idx)
-        if cfg then
-            local m = peripheral.wrap(cfg)
-            if m then return m, cfg, "config" end
-        end
-        local r = bucket[idx]
-        if r then return r.mon, r.name, "auto" end
-        return nil, nil, "missing"
-    end
-
-    local result    = {}
-    local nameOf    = {}
-    local sourceOf  = {}
     local assigns = {
-        {"helpMon",   CFG_HELP,   squarish, 1},
-        {"faceMon",   CFG_FACE,   squarish, 2},
-        {"energyMon", CFG_ENERGY, squarish, 3},
-        {"lightsMon", CFG_LIGHTS, squarish, 4},
-        {"stoMon",    CFG_STO,    portrait, 1},
-        {"lastMon",   CFG_LAST,   portrait, 2},
-        {"clockMon",  CFG_CLOCK,  veryWide, 1},
+        {"helpMon",   "help",    CFG_HELP},
+        {"faceMon",   "face",    CFG_FACE},
+        {"energyMon", "energy",  CFG_ENERGY},
+        {"lightsMon", "lights",  CFG_LIGHTS},
+        {"stoMon",    "storage", CFG_STO},
+        {"lastMon",   "last",    CFG_LAST},
+        {"clockMon",  "clock",   CFG_CLOCK},
     }
+
+    local result   = {}
+    local nameOf   = {}
+    local sourceOf = {}
+    local used     = {}
     for _, a in ipairs(assigns) do
-        local mon, name, src = resolve(a[2], a[3], a[4])
-        result[a[1]]   = mon
-        nameOf[a[1]]   = name
-        sourceOf[a[1]] = src
+        local cfg = a[3]
+        local m = cfg and peripheral.wrap(cfg)
+        if m then
+            result[a[1]], nameOf[a[1]], sourceOf[a[1]] = m, cfg, "config"
+            used[cfg] = true
+        end
+    end
+
+    local pool, roles = {}, {}
+    for _, r in ipairs(found) do
+        if not used[r.name] then table.insert(pool, r) end
+    end
+    for _, a in ipairs(assigns) do
+        if not result[a[1]] then
+            for _, def in ipairs(MON_ROLES) do
+                if def[1] == a[2] then table.insert(roles, def) end
+            end
+        end
+    end
+    local picked = cfgio.assignMonitors(pool, roles)
+    for _, a in ipairs(assigns) do
+        if not result[a[1]] then
+            local r = picked[a[2]]
+            if r then
+                result[a[1]], nameOf[a[1]], sourceOf[a[1]] = peripheral.wrap(r.name), r.name, "auto"
+            else
+                sourceOf[a[1]] = "missing"
+            end
+        end
     end
 
     print("[JARVIS] Assignments:")
