@@ -170,8 +170,15 @@ end
 
 local function chatSend(msg)
     if not box then return end
-    if apChat08 then pcall(box.sendMessage, msg, { prefix = "Jarvis" })
-    else             pcall(box.sendMessage, msg, "Jarvis") end
+    local ok, res, err
+    if apChat08 then ok, res, err = pcall(box.sendMessage, msg, { prefix = "Jarvis" })
+    else             ok, res, err = pcall(box.sendMessage, msg, "Jarvis") end
+    if not (ok and res) then
+        ok, res, err = pcall(box.sendMessage, msg)
+    end
+    if not (ok and res) then
+        print("[JARVIS] Chat box send failed: "..tostring(ok and err or res))
+    end
 end
 
 -- Redstone relays (each role is its own relay).
@@ -245,6 +252,15 @@ verifyName("speaker",  speakerName)
 verifyName("light",    lightsRIName)
 verifyName("talk",     talkRIName)
 verifyName("scroll",   scrollerRIName)
+
+if box then
+    local okName, boxName = pcall(peripheral.getName, box)
+    print("[JARVIS] Chat box: "..(okName and tostring(boxName) or "?")
+        .." (Advanced Peripherals "..(apChat08 and "0.8+" or "0.7")..")")
+else
+    print("[JARVIS] WARNING: no chat box found. Connect it to this computer")
+    print("[JARVIS]          (right-click its wired modem) and restart.")
+end
 
 -- ═══════════════════════════════════════════════════════
 --  SATELLITE COMMS
@@ -1353,10 +1369,15 @@ local function chatLoop()
     while running do
         local _, a, b, c = os.pullEvent("chat")
         local user, rawMsg = a, b
-        if apChat08 then user, rawMsg = b, c end
+        if apChat08 or a == nil or (type(a) == "string" and a:match("^%x+%-%x+%-%x+%-%x+%-%x+$")) then
+            user, rawMsg = b, c
+        end
+        print("[JARVIS] chat <"..tostring(user).."> "..tostring(rawMsg))
+        if type(rawMsg) ~= "string" then goto continue end
         local msg   = rawMsg:lower():gsub("^%s+",""):gsub("%s+$","")
         local words = {}
         for w in msg:gmatch("%S+") do table.insert(words, w) end
+        if words[1] then words[1] = (words[1]:gsub("%p", "")) end
         if words[1] ~= "jarvis" then goto continue end
 
         local cmd = words[2] and words[2]:lower() or nil
