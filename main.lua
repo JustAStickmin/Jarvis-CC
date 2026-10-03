@@ -1,5 +1,5 @@
 -- JARVIS - CC: Tweaked AI Assistant
--- Peripherals: chatBox, meBridge, redstoneRelay x N, speaker, 7 monitors
+-- Peripherals: chatBox, meBridge, redstoneIntegrator or redstoneRelay x N, speaker, 7 monitors
 
 -- ═══════════════════════════════════════════════════════
 --  CONFIG
@@ -58,7 +58,7 @@ local function autogenMainConfig()
                  .. "meBridge: auto\n"
                  .. "speaker:  auto\n"
 
-    -- Detect redstone relays in network order so we can pre-fill.
+    -- Detect redstone integrators and relays in network order so we can pre-fill.
     local ris = {}
     for _, name in ipairs(peripheral.getNames()) do
         local t = peripheral.getType(name)
@@ -83,8 +83,8 @@ local function autogenMainConfig()
     content = content
         .. "\n"
         .. "-- Redstone --\n"
-        .. "# light  : redstone relay that drives the lights (ON/OFF output).\n"
-        .. "# talk   : redstone relay pulsed HIGH while JARVIS speaks.\n"
+        .. "# light  : redstone integrator or relay that drives the lights (ON/OFF output).\n"
+        .. "# talk   : redstone integrator or relay pulsed HIGH while JARVIS speaks.\n"
         .. "light:   "..rsLight.."\n"
         .. "talk:    "..rsTalk.."\n"
         .. "\n"
@@ -96,7 +96,7 @@ local function autogenMainConfig()
         .. "scroll:  "..rsScroll.."\n"
 
     cfgio.writeFile("config.txt", content)
-    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) and "..#ris.." relay(s) detected.")
+    print("[JARVIS] Created config.txt with "..#mons.." monitor(s) and "..#ris.." integrator(s)/relay(s) detected.")
 end
 
 if not fs.exists("config.txt") then
@@ -154,7 +154,7 @@ local function chatSend(msg)
     end
 end
 
--- Redstone relays (each role is its own relay).
+-- Redstone integrators or relays (each role is its own peripheral).
 local lightsRIName   = find("light")    -- lights on/off
 local talkRIName     = find("talk")     -- ON while speaking
 local scrollerRIName = find("scroll")   -- 0-15 input picks help page
@@ -797,7 +797,7 @@ local function drawHelp()
 end
 
 -- Multi-page help.  Page 0 is the live command list.  Pages 1-15 are
--- TBD placeholders driven by the scroller relay's analog input.
+-- TBD placeholders driven by the scroller's analog input.
 local currentHelpPage = 0
 local function drawHelpPage(n)
     n = math.max(0, math.min(15, math.floor(n or 0)))
@@ -1522,11 +1522,11 @@ local function clockLoop()   while running do drawClock()   ; sleep(1)   end end
 local function energyLoop()  while running do drawEnergy()  ; sleep(5)   end end
 
 -- Reads a "value" from whatever peripheral is wired as the scroller.
--- Duck-typed: tries redstone relay's getAnalogInput first, then
+-- Duck-typed: tries redstone integrator or relay's getAnalogInput first, then
 -- common CC:Create Bridge method names. Returns 0 if nothing works.
 local function readScrollerValue()
     if not scrollerRI then return 0 end
-    -- 1) Redstone relay: max analog signal across all sides.
+    -- 1) Redstone integrator or relay: max analog signal across all sides.
     if scrollerRI.getAnalogInput then
         local maxVal = 0
         for _, side in ipairs(allSides) do

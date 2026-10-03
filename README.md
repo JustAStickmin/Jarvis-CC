@@ -9,9 +9,14 @@ Type `jarvis <command>` in Minecraft chat (within range of the chatBox) and JARV
 ## Required mods
 
 - **CC: Tweaked** — the base mod
-- **Advanced Peripherals** — for the chatBox, ME Bridge, and Redstone Integrators
+- **Advanced Peripherals** — for the chatBox, ME Bridge, and Redstone Integrators (or CC: Tweaked Redstone Relays)
 - **Applied Energistics 2** — the storage network JARVIS reports on
 - **CC:C Bridge** — for future Create mod integration
+
+## Supported versions
+
+- **CC: Tweaked** 1.109+ (Redstone Relay needs 1.114+)
+- **Advanced Peripherals** 0.7 (Minecraft 1.20.1, 1.20.4, 1.21.1) and 0.8
 
 ## Required peripherals (wired to the computer via Wired Modems)
 
@@ -20,12 +25,12 @@ Type `jarvis <command>` in Minecraft chat (within range of the chatBox) and JARV
 | Chat Box | 1 | Reading chat commands and speaking back |
 | ME Bridge | 1 | Reading AE2 storage and energy data |
 | Speaker | 1 | Melodies and sound effects |
-| Redstone Integrator | 1+ | Each one controls one set of lights |
+| Redstone Integrator or Redstone Relay | 1+ | Each one controls one set of lights |
 | Monitor | 7 | HUD, commands list, storage, energy, last response, clock, lights |
 
 ## Monitor layout
 
-JARVIS auto-detects monitors by their aspect ratio, but you can override the assignments at the top of `main.lua` by setting the `CFG_*` variables to specific peripheral names like `"monitor_3"`.
+JARVIS auto-detects monitors by their size, but you can override the assignments in `config.txt` by setting the roles to specific peripheral names like `monitor_3`.
 
 | Role | Size (WxH) | Purpose |
 |---|---|---|

@@ -33,7 +33,7 @@ Type any of these in Minecraft chat within range of the chat box.
 | `jarvis flip` | Coin flip |
 | `jarvis roll` | d6 dice roll |
 
-### Lights (redstone integrator)
+### Lights (redstone integrator or relay)
 
 | Command | What it does |
 |---|---|
@@ -157,7 +157,7 @@ The `play <sound>` command can play ANY Minecraft sound ID directly via `speaker
 
 ## Redstone Controls
 
-Three redstone integrators, each driven by a distinct role in `config.txt`:
+Three redstone integrators or relays, each driven by a distinct role in `config.txt`:
 
 | Role | Type | Behavior |
 |---|---|---|
@@ -215,7 +215,7 @@ Sections:
 
 - **Monitors (main)** — `role: peripheralName, WxH` per monitor
 - **Peripherals** — chatBox / meBridge / speaker overrides
-- **Redstone** — light / talk integrator names
+- **Redstone** — light / talk integrator or relay names
 - **Inputs** — scroll peripheral name
 
 Run `labels` in-game first to see each monitor's peripheral name.
@@ -253,7 +253,7 @@ JARVIS prints at boot:
 
 - Loaded config.txt entries (one line per role)
 - WARNINGS if any configured peripheral name doesn't resolve
-- Detected monitor list with sizes + shape classification
+- Detected monitor list with sizes
 - Final role → peripheral assignments, tagged `(config)` or `(auto)` so you know which came from where
 - Scroller initialization state (limit applied, current value)
 - Satellite discovery events as satellites come online
